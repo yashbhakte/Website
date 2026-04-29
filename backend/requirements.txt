@@ -1,0 +1,7 @@
+ultralytics
+fastapi
+uvicorn
+pandas
+openpyxl
+pillow
+python-multipart
