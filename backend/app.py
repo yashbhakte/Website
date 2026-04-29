@@ -48,8 +48,12 @@ if not os.path.exists(UPLOADS_DIR):
 app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 
 # Constants
-MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "best.pt")
-EXCEL_PATH = os.path.join(os.path.dirname(__file__), "..", "Fabric Defect Reason,Machine,Suggestion Dataset.xlsx")
+import os
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+MODEL_PATH = os.path.join(BASE_DIR,"model","best.pt")
+EXCEL_PATH = os.path.join(BASE_DIR,"data","Fabric Defect Reason,Machine,Suggestion Dataset.xlsx")
 
 # Global variables
 model = None
