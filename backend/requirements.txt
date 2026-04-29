@@ -1,7 +1,10 @@
-ultralytics
 fastapi
 uvicorn
+ultralytics
+torch
+opencv-python-headless
+pillow
 pandas
 openpyxl
-pillow
 python-multipart
+sqlalchemy
