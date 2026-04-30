@@ -9,3 +9,4 @@ openpyxl
 python-multipart
 sqlalchemy
 python-jose
+passlib[bcrypt]
