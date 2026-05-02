@@ -5,22 +5,6 @@
 
 'use strict';
 
-const API_BASE = 'http://localhost:8000';
-
-/**
- * Parses a date string from the backend, ensuring it's treated as UTC 
- * if no timezone information is present.
- */
-function parseUTCDate(dateStr) {
-  if (!dateStr) return new Date();
-  // If the string doesn't end with Z and doesn't contain a timezone offset (+/-HH:MM),
-  // append 'Z' to force the browser to treat it as UTC.
-  if (!dateStr.endsWith('Z') && !/[+-]\d{2}:\d{2}$/.test(dateStr)) {
-    return new Date(dateStr + 'Z');
-  }
-  return new Date(dateStr);
-}
-
 /* ── DEFECT DATABASE ──────────────────────────────────────────────
    Maps defect class names to root-cause analysis data.
    In production this would come from a backend model API.
@@ -78,19 +62,37 @@ const DEMO_IMAGES = [
   'fabric_defect.png',
 ];
 
+/* ── API CONFIGURATION ───────────────────────────────────────── */
+const API_BASE_URL = "https://fabric-dd.onrender.com";
+
+function setAuthToken(token) {
+  localStorage.setItem('token', token);
+}
+
+function getAuthToken() {
+  return localStorage.getItem('token');
+}
+
+function removeAuthToken() {
+  localStorage.removeItem('token');
+}
+
+/* ── ROLES ───────────────────────────────────────────────────── */
+const ROLES = ['Floor Operator', 'Shift Supervisor', 'QA Manager', 'Plant Director'];
+let currentRoleIndex = 0;
+
 /* ─────────────────────────────────────────────────────────────
    APPLICATION STATE
    ───────────────────────────────────────────────────────────── */
 const appState = {
-  token: localStorage.getItem('fg_token') || null,
-  currentImage: null,       // data URL or blob URL
-  currentResult: null,      // defect result object
-  cameraStream: null,       // MediaStream
+  currentImage: null,
+  currentResult: null,
+  cameraStream: null,
   isCameraActive: false,
   isProcessing: false,
-  logs: [],                 // array of log entries
+  logs: [],
   analytics: { total: 0, defects: 0, ok: 0 },
-  user: { name: localStorage.getItem('fg_user_name') || '', email: '' },
+  user: { name: 'John Doe', email: '' },
 };
 
 /* ─────────────────────────────────────────────────────────────
@@ -99,7 +101,6 @@ const appState = {
 const $ = (id) => document.getElementById(id);
 
 const DOM = {
-  // Header
   networkStatus: $('network-status'),
   statusDot: $('status-dot'),
   statusLabel: $('status-label'),
@@ -111,7 +112,6 @@ const DOM = {
   profileName: $('profile-name'),
   profileDropdown: $('profile-dropdown'),
 
-  // Auth Views
   loginLayout: $('login-layout'),
   loginView: $('login-view'),
   signupView: $('signup-view'),
@@ -132,7 +132,6 @@ const DOM = {
   forgotStep2: $('forgot-step-2'),
   btnResetPassword: $('btn-reset-password'),
 
-  // Capture View
   viewCapture: $('view-capture'),
   cameraFrame: $('camera-frame'),
   cameraIdle: $('camera-idle'),
@@ -144,11 +143,10 @@ const DOM = {
   btnOpenCamera: $('btn-open-camera'),
   btnUploadImage: $('btn-upload-image'),
   btnCapturePhoto: $('btn-capture-photo'),
-  // btnDemoScan: $('btn-demo-scan'),
+  btnDemoScan: $('btn-demo-scan'),
   fileInput: $('file-input'),
   captureCanvas: $('capture-canvas'),
 
-  // Results View
   viewResults: $('view-results'),
   resultTimestamp: $('result-timestamp'),
   classificationBanner: $('classification-banner'),
@@ -170,7 +168,6 @@ const DOM = {
   btnClear: $('btn-clear'),
   toastContainer: $('toast-container'),
 
-  // Logs Panel
   shiftLogsPanel: $('shift-logs-panel'),
   logsClose: $('logs-close'),
   sidebarBackdrop: $('sidebar-backdrop'),
@@ -183,7 +180,6 @@ const DOM = {
   btnExportCsv: $('btn-export-csv'),
   btnClearLogs: $('btn-clear-logs'),
 
-  // ERP Modal
   erpModal: $('erp-modal'),
   erpModalClose: $('erp-modal-close'),
   erpCancel: $('erp-cancel'),
@@ -202,12 +198,14 @@ function updateNetworkStatus() {
   if (!online) showToast('warning', 'Offline Mode', 'Network unavailable. Results cached locally.', 5000);
 }
 
-window.addEventListener('online', updateNetworkStatus);
-window.addEventListener('offline', updateNetworkStatus);
-updateNetworkStatus();
+function initNetworkStatusListener() {
+  window.addEventListener('online', updateNetworkStatus);
+  window.addEventListener('offline', updateNetworkStatus);
+  updateNetworkStatus();
+}
 
 /* ═══════════════════════════════════════════════════════════════
-   2. PROFILE & BRAND DROPDOWNS
+   2. PROFILE DROPDOWN
    ═══════════════════════════════════════════════════════════════ */
 function toggleProfileDropdown() {
   const isExpanded = DOM.profileTrigger.getAttribute('aria-expanded') === 'true';
@@ -220,24 +218,12 @@ function closeProfileDropdown() {
   DOM.profileDropdown.classList.add('hidden');
 }
 
-DOM.profileTrigger.addEventListener('click', (e) => {
-  e.stopPropagation();
-  toggleProfileDropdown();
-});
-
-document.addEventListener('click', (e) => {
-  if (!DOM.profileContainer.contains(e.target)) closeProfileDropdown();
-});
-
 function signOut() {
   closeProfileDropdown();
-  appState.token = null;
+  removeAuthToken();
   appState.user.name = '';
   appState.user.email = '';
-  localStorage.removeItem('fg_token');
-  localStorage.removeItem('fg_user_name');
 
-  // Transition back to login
   $('app-layout').classList.add('hidden');
   DOM.headerRight.classList.add('hidden');
   DOM.loginLayout.classList.remove('hidden');
@@ -247,18 +233,36 @@ function signOut() {
   showToast('info', 'Signed Out', 'You have been securely logged out.');
 }
 
-document.querySelectorAll('.btn-sign-out-trigger').forEach(btn => {
-  btn.addEventListener('click', signOut);
-});
+function initProfileDropdownListeners() {
+  if (!DOM.profileTrigger) return;
+
+  DOM.profileTrigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleProfileDropdown();
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!DOM.profileContainer.contains(e.target)) closeProfileDropdown();
+  });
+
+  document.querySelectorAll('.btn-sign-out-trigger').forEach(btn => {
+    btn.addEventListener('click', signOut);
+  });
+}
 
 /* ═══════════════════════════════════════════════════════════════
-   2.1 AUTH CONTROLLER (REAL BACKEND INTEGRATION)
+   2.1 LOGIN CONTROLLER
    ═══════════════════════════════════════════════════════════════ */
 async function handleLogin(e) {
   e.preventDefault();
 
   const email = DOM.loginId.value.trim();
-  const password = DOM.loginPassword.value;
+  const password = DOM.loginPassword.value.trim();
+
+  if (!email || !password) {
+    showToast('error', 'Missing Details', 'Please enter email and password.');
+    return;
+  }
 
   const btn = DOM.loginForm.querySelector('button[type="submit"]');
   const originalLabel = btn.innerHTML;
@@ -267,50 +271,66 @@ async function handleLogin(e) {
 
   try {
     const formData = new URLSearchParams();
-    formData.append('username', email); // FastAPI OAuth2 uses 'username' field
+    formData.append('username', email);
     formData.append('password', password);
 
-    const response = await fetch(`${API_BASE}/login`, {
+    const loginResponse = await fetch(`${API_BASE_URL}/login`, {
       method: 'POST',
-      body: formData,
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: formData.toString(),
     });
 
-    if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.detail || 'Login failed');
+    if (!loginResponse.ok) {
+      const errorData = await loginResponse.json().catch(() => ({}));
+      throw new Error(errorData.detail || 'Login failed');
     }
 
-    const data = await response.json();
-    
-    // Save state
-    appState.token = data.access_token;
-    appState.user.name = data.user_name;
-    localStorage.setItem('fg_token', data.access_token);
-    localStorage.setItem('fg_user_name', data.user_name);
+    const loginData = await loginResponse.json();
+    console.log("Login response:", loginData);  // debug
 
-    // Update Profile Info
-    DOM.profileName.textContent = data.user_name;
+    if (loginData.access_token) {
+      localStorage.setItem("token", loginData.access_token);
+      console.log("Token saved:", loginData.access_token);
+    } else {
+      console.error("No token received");
+    }
 
-    // Fetch initial data
-    await Promise.all([fetchHistory(), fetchAnalytics()]);
+    const token = loginData.access_token;
 
-    // Transition Views
+    if (!token) {
+      throw new Error('No access token received from server');
+    }
+
+    const profileResponse = await fetch(`${API_BASE_URL}/users/me`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!profileResponse.ok) {
+      throw new Error('Could not load user profile');
+    }
+
+    const userData = await profileResponse.json();
+
+    appState.user.name = userData.full_name || 'User';
+    appState.user.email = userData.email || email;
+
+    DOM.profileName.textContent = appState.user.name;
+
     DOM.loginLayout.classList.remove('active');
     DOM.loginLayout.classList.add('hidden');
-    
     $('app-layout').classList.remove('hidden');
-    $('app-layout').classList.add('active');
-    
     DOM.headerRight.classList.remove('hidden');
 
-    // Set default sub-view
-    DOM.viewCapture.classList.remove('hidden');
-    DOM.viewCapture.classList.add('active');
+    showToast('success', 'Access Granted', `Welcome back, ${appState.user.name}.`);
 
-    showToast('success', 'Access Granted', `Welcome back, ${data.user_name}. Authorized session started.`);
   } catch (err) {
-    showToast('error', 'Login Failed', err.message);
+    console.error('Login error:', err);
+    showToast('error', 'Login Failed', err.message || 'Incorrect email or password.', 6000);
   } finally {
     btn.disabled = false;
     btn.innerHTML = originalLabel;
@@ -322,7 +342,12 @@ async function handleSignup(e) {
 
   const name = DOM.signupName.value.trim();
   const email = DOM.signupId.value.trim();
-  const password = DOM.signupPassword.value;
+  const password = DOM.signupPassword.value.trim();
+
+  if (!name || !email || !password) {
+    showToast('error', 'Validation Error', 'Please fill in all fields.');
+    return;
+  }
 
   const btn = DOM.signupForm.querySelector('button[type="submit"]');
   const originalLabel = btn.innerHTML;
@@ -330,25 +355,74 @@ async function handleSignup(e) {
   btn.innerHTML = `<span style="display:flex;align-items:center;gap:8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin-ring 0.8s linear infinite;"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>Creating Account...</span>`;
 
   try {
-    const response = await fetch(`${API_BASE}/signup`, {
+    const response = await fetch(`${API_BASE_URL}/signup`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ full_name: name, email, password })
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        full_name: name,
+        username: email,
+        email: email,
+        password: password
+      })
     });
 
     if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.detail || 'Signup failed');
+      const error = await response.json();
+      throw new Error(error.detail || 'Signup failed');
     }
+
+    appState.user.name = name;
+    appState.user.email = email;
+
+    btn.disabled = false;
+    btn.innerHTML = originalLabel;
 
     showToast('success', 'Account Created', `Registration successful for ${name}. You can now sign in.`);
     showLoginView();
   } catch (err) {
-    showToast('error', 'Signup Failed', err.message);
-  } finally {
+    console.error('Signup error:', err);
     btn.disabled = false;
     btn.innerHTML = originalLabel;
+    showToast('error', 'Signup Failed', err.message || 'Please check your credentials and try again.');
   }
+}
+
+function handleForgotPassword(e) {
+  e.preventDefault();
+
+  const btn = DOM.forgotForm.querySelector('button[type="submit"]');
+  btn.disabled = true;
+  btn.innerHTML = `<span style="display:flex;align-items:center;gap:8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin-ring 0.8s linear infinite;"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>Sending OTP...</span>`;
+
+  setTimeout(() => {
+    btn.disabled = false;
+    btn.innerHTML = `Send OTP`;
+
+    DOM.forgotStep1.classList.add('hidden');
+    DOM.forgotStep2.classList.remove('hidden');
+    showToast('info', 'OTP Sent', 'Check your email for the 6-digit reset code.');
+  }, 1200);
+}
+
+function handleResetPassword() {
+  const btn = DOM.btnResetPassword;
+  btn.disabled = true;
+  btn.innerHTML = `<span style="display:flex;align-items:center;gap:8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin-ring 0.8s linear infinite;"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>Updating...</span>`;
+
+  setTimeout(() => {
+    btn.disabled = false;
+    btn.innerHTML = `<span class="btn__label">Update Password</span>`;
+
+    showToast('success', 'Password Updated', 'Your password has been reset successfully.');
+    showLoginView();
+
+    setTimeout(() => {
+      DOM.forgotStep1.classList.remove('hidden');
+      DOM.forgotStep2.classList.add('hidden');
+    }, 500);
+  }, 1500);
 }
 
 function showSignupView() {
@@ -387,85 +461,458 @@ function togglePasswordVisibility(e) {
     : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
 }
 
-DOM.loginForm.addEventListener('submit', handleLogin);
-DOM.signupForm.addEventListener('submit', handleSignup);
-DOM.btnShowSignup.addEventListener('click', showSignupView);
-DOM.btnShowLogin.addEventListener('click', showLoginView);
-DOM.btnShowForgot.addEventListener('click', showForgotView);
-document.querySelectorAll('.btn-show-login-alt').forEach(btn => btn.addEventListener('click', showLoginView));
-DOM.btnTogglePasswords.forEach(btn => btn.addEventListener('click', togglePasswordVisibility));
+function initAuthListeners() {
+  if (DOM.loginForm) DOM.loginForm.addEventListener('submit', handleLogin);
+  if (DOM.signupForm) DOM.signupForm.addEventListener('submit', handleSignup);
+  if (DOM.forgotForm) DOM.forgotForm.addEventListener('submit', handleForgotPassword);
+  if (DOM.btnResetPassword) DOM.btnResetPassword.addEventListener('click', handleResetPassword);
 
-/* ═══════════════════════════════════════════════════════════════
-   3. DATA FETCHING (HISTORY & ANALYTICS)
-   ═══════════════════════════════════════════════════════════════ */
-async function fetchHistory() {
-  if (!appState.token) return;
-  try {
-    const response = await fetch(`${API_BASE}/history`, {
-      headers: { 'Authorization': `Bearer ${appState.token}` }
-    });
-    if (!response.ok) throw new Error('Failed to fetch history');
-    const data = await response.json();
-    
-    appState.logs = data.map(scan => ({
-      id: scan.id,
-      time: parseUTCDate(scan.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-      defectType: scan.defect_key === 'defect free' ? 'Defect Free' : scan.defect_label,
-      machine: scan.machine,
-      status: scan.status,
-      confidence: scan.confidence
-    }));
-    
-    renderLogsTable();
-    if (DOM.logCountBadge) DOM.logCountBadge.textContent = appState.logs.length;
-  } catch (err) {
-    console.error('History fetch error:', err);
+  if (DOM.btnShowSignup) DOM.btnShowSignup.addEventListener('click', showSignupView);
+  if (DOM.btnShowLogin) DOM.btnShowLogin.addEventListener('click', showLoginView);
+  if (DOM.btnShowForgot) DOM.btnShowForgot.addEventListener('click', showForgotView);
+
+  document.querySelectorAll('.btn-show-login-alt').forEach(btn => {
+    btn.addEventListener('click', showLoginView);
+  });
+
+  if (DOM.btnTogglePasswords) {
+    DOM.btnTogglePasswords.forEach(btn => btn.addEventListener('click', togglePasswordVisibility));
   }
 }
 
-async function fetchAnalytics() {
-  if (!appState.token) return;
-  try {
-    const response = await fetch(`${API_BASE}/analytics`, {
-      headers: { 'Authorization': `Bearer ${appState.token}` }
+/* ═══════════════════════════════════════════════════════════════
+   3. SHIFT LOGS SIDEBAR
+   ═══════════════════════════════════════════════════════════════ */
+function openLogsPanel() {
+  if (!DOM.shiftLogsPanel) return;
+  DOM.shiftLogsPanel.setAttribute('aria-hidden', 'false');
+  DOM.sidebarBackdrop.classList.remove('hidden');
+  if (DOM.logsToggle) DOM.logsToggle.setAttribute('aria-expanded', 'true');
+  if (DOM.logsClose) DOM.logsClose.focus();
+  document.body.style.overflow = 'hidden';
+}
+
+function closeLogsPanel() {
+  if (!DOM.shiftLogsPanel) return;
+  DOM.shiftLogsPanel.setAttribute('aria-hidden', 'true');
+  if (DOM.sidebarBackdrop) DOM.sidebarBackdrop.classList.add('hidden');
+  if (DOM.logsToggle) DOM.logsToggle.setAttribute('aria-expanded', 'false');
+  if (DOM.logsToggle) DOM.logsToggle.focus();
+  document.body.style.overflow = '';
+}
+
+function initLogsPanelListeners() {
+  if (DOM.logsToggle) {
+    DOM.logsToggle.addEventListener('click', () => {
+      const isOpen = DOM.shiftLogsPanel.getAttribute('aria-hidden') === 'false';
+      isOpen ? closeLogsPanel() : openLogsPanel();
     });
-    if (!response.ok) throw new Error('Failed to fetch analytics');
-    const data = await response.json();
-    
-    appState.analytics = data;
-    updateAnalytics();
+  }
+
+  if (DOM.logsClose) DOM.logsClose.addEventListener('click', closeLogsPanel);
+  if (DOM.sidebarBackdrop) DOM.sidebarBackdrop.addEventListener('click', closeLogsPanel);
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (DOM.shiftLogsPanel && DOM.shiftLogsPanel.getAttribute('aria-hidden') === 'false') closeLogsPanel();
+    }
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   4. CAMERA & IMAGE CAPTURE
+   ═══════════════════════════════════════════════════════════════ */
+function initCameraListeners() {
+  if (!DOM.btnOpenCamera) return;
+
+  DOM.btnOpenCamera.addEventListener('click', async () => {
+    if (appState.isCameraActive) {
+      stopCamera();
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
+      appState.cameraStream = stream;
+      appState.isCameraActive = true;
+
+      DOM.cameraFeed.srcObject = stream;
+      DOM.cameraFeed.classList.remove('hidden');
+      DOM.cameraIdle.classList.add('hidden');
+      DOM.imagePreview.classList.add('hidden');
+      DOM.scanLine.classList.remove('hidden');
+
+      DOM.btnOpenCamera.innerHTML = `
+        <span class="btn__icon" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </span>
+        <span class="btn__label">Stop Camera</span>`;
+      DOM.btnCapturePhoto.classList.remove('hidden');
+      DOM.btnUploadImage.classList.add('hidden');
+      showToast('info', 'Camera Active', 'Point camera at fabric sample, then tap Capture.');
+    } catch (err) {
+      console.error('Camera access error:', err);
+      if (err.name === 'NotAllowedError') {
+        showToast('error', 'Permission Denied', 'Camera access was blocked. Falling back to file upload.');
+      } else if (err.name === 'NotFoundError') {
+        showToast('error', 'No Camera Found', 'No camera device detected. Use file upload instead.');
+      } else {
+        showToast('error', 'Camera Error', err.message || 'Could not access camera device.');
+      }
+    }
+  });
+
+  if (DOM.btnCapturePhoto) {
+    DOM.btnCapturePhoto.addEventListener('click', () => {
+      const video = DOM.cameraFeed;
+      const canvas = DOM.captureCanvas;
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const dataURL = canvas.toDataURL('image/jpeg', 0.92);
+      stopCamera();
+      processImage(dataURL, 'camera');
+    });
+  }
+
+  if (DOM.btnUploadImage) {
+    DOM.btnUploadImage.addEventListener('click', () => {
+      DOM.fileInput.click();
+    });
+  }
+
+  if (DOM.fileInput) {
+    DOM.fileInput.addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (!file.type.startsWith('image/')) {
+        showToast('error', 'Invalid File', 'Please select a valid image file (JPEG, PNG, TIFF, etc.).');
+        return;
+      }
+      if (file.size > 20 * 1024 * 1024) {
+        showToast('error', 'File Too Large', 'Maximum image size is 20 MB.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (ev) => processImage(ev.target.result, 'upload');
+      reader.readAsDataURL(file);
+      e.target.value = '';
+    });
+  }
+}
+
+function stopCamera() {
+  if (appState.cameraStream) {
+    appState.cameraStream.getTracks().forEach(t => t.stop());
+    appState.cameraStream = null;
+  }
+  appState.isCameraActive = false;
+  DOM.cameraFeed.srcObject = null;
+  DOM.cameraFeed.classList.add('hidden');
+  DOM.scanLine.classList.add('hidden');
+  DOM.btnCapturePhoto.classList.add('hidden');
+  DOM.btnUploadImage.classList.remove('hidden');
+  DOM.cameraIdle.classList.remove('hidden');
+  DOM.btnOpenCamera.innerHTML = `
+    <span class="btn__icon" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+        <circle cx="12" cy="13" r="4"/>
+      </svg>
+    </span>
+    <span class="btn__label">Open Device Camera</span>`;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   5. REAL AI PROCESSING
+   ═══════════════════════════════════════════════════════════════ */
+function dataURLtoBlob(dataurl) {
+  const arr = dataurl.split(',');
+  const mime = arr[0].match(/:(.*?);/)[1];
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+
+  return new Blob([u8arr], { type: mime });
+}
+
+function buildDemoResult() {
+  return {
+    key: 'hole',
+    label: 'Defect Found: Hole',
+    status: 'defect',
+    severity: 'High',
+    icon: DEFECT_DATABASE['hole'].icon,
+    reason1: 'Broken needle hook or sharp metal fragment puncturing fabric.',
+    reason2: 'Weak yarn snapping under excess tensile stress during knitting.',
+    reason3: 'Improper fabric take-up tension pulling too tight.',
+    machine: 'Knitting Machine / Circular Weft Knitter',
+    suggestion: 'Inspect needle bed immediately, replace damaged hooks, and verify yarn feeder tension settings.',
+    confidence: '94.2',
+    source: 'demo'
+  };
+}
+
+async function processImage(imageDataURL, source) {
+  if (appState.isProcessing) return;
+  appState.isProcessing = true;
+  appState.currentImage = imageDataURL;
+
+  DOM.imagePreview.src = imageDataURL;
+  DOM.imagePreview.classList.remove('hidden');
+  DOM.cameraIdle.classList.add('hidden');
+  DOM.processingOverlay.classList.remove('hidden');
+
+  const modelNames = [
+    'YOLOv8 Model Processing...',
+    'Loading inference engine...',
+    'Detecting fabric anomalies...',
+    'Analyzing defect patterns...',
+    'Cross-referencing datasets...',
+    'Finalizing diagnostic report...',
+  ];
+  const modelNameEl = DOM.processingOverlay.querySelector('.processing-model-name');
+  let labelIdx = 0;
+  const labelInterval = setInterval(() => {
+    labelIdx = (labelIdx + 1) % modelNames.length;
+    modelNameEl.textContent = modelNames[labelIdx];
+  }, 500);
+
+  try {
+    let blob;
+
+    if (imageDataURL.startsWith('data:')) {
+      blob = dataURLtoBlob(imageDataURL);
+    } else {
+      const response = await fetch(imageDataURL);
+      if (!response.ok) throw new Error(`Failed to fetch image: ${response.statusText}`);
+      blob = await response.blob();
+    }
+
+    const formData = new FormData();
+    formData.append('file', blob, 'capture.jpg');
+
+    const token = getAuthToken();
+    const headers = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/predict`, {
+      method: 'POST',
+      headers: headers,
+      body: formData
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Backend prediction failed: ${response.status} - ${errorText}`);
+    }
+
+    const apiResult = await response.json();
+    console.log('predict response', apiResult);
+
+    clearInterval(labelInterval);
+    DOM.processingOverlay.classList.add('hidden');
+    appState.isProcessing = false;
+
+    const uiConfig = DEFECT_DATABASE[apiResult.defect_key] || DEFECT_DATABASE['hole'];
+
+    const result = {
+      key: apiResult.defect_key,
+      label: apiResult.status === 'ok'
+        ? 'Status: Defect Free'
+        : `Defect Found: ${apiResult.defect_label}`,
+      status: apiResult.status,
+      severity: apiResult.severity,
+      icon: uiConfig.icon,
+      reason1: apiResult.reason_1,
+      reason2: apiResult.reason_2,
+      reason3: apiResult.reason_3,
+      machine: apiResult.machine,
+      suggestion: apiResult.suggestion,
+      confidence: apiResult.confidence,
+      source: source
+    };
+
+    appState.currentResult = result;
+    console.log('final result object', result);
+    console.log('calling showResults now');
+    showResults(result, imageDataURL, apiResult.confidence);
+
   } catch (err) {
-    console.error('Analytics fetch error:', err);
+    console.error('Processing error:', err);
+    clearInterval(labelInterval);
+    DOM.processingOverlay.classList.add('hidden');
+    appState.isProcessing = false;
+
+    if (source === 'demo') {
+      const demoResult = buildDemoResult();
+      appState.currentResult = demoResult;
+      showResults(demoResult, imageDataURL, demoResult.confidence);
+      showToast('info', 'Demo Mode', 'Backend unavailable, showing demo result.', 5000);
+      return;
+    }
+
+    showToast(
+      'error',
+      'Prediction Failed',
+      err.message || 'Could not connect to the backend server.',
+      8000
+    );
+  }
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   6. DISPLAY RESULTS
+   ═══════════════════════════════════════════════════════════════ */
+function showResults(result, imageURL, confidence) {
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const dateStr = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+
+  DOM.viewCapture.classList.remove('active');
+  DOM.viewCapture.classList.add('hidden');
+  DOM.viewResults.classList.add('active');
+  DOM.viewResults.classList.remove('hidden');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  DOM.resultTimestamp.textContent = `Analysis completed at ${timeStr} — ${dateStr}`;
+
+  DOM.classificationBanner.className = `classification-banner state--${result.status}`;
+  DOM.classificationIcon.innerHTML = result.icon;
+  DOM.classificationLabel.textContent = result.status === 'ok' ? 'Quality Status' : 'Defect Alert';
+  DOM.classificationValue.textContent = result.label;
+  DOM.confidenceValue.textContent = `${confidence}%`;
+
+  DOM.resultImage.src = imageURL;
+
+  const defectClass = (result.key === 'defect_free' || result.key === 'defect free')
+    ? 'Clear'
+    : String(result.key || 'Unknown').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  DOM.qsDefectType.textContent = defectClass;
+  DOM.qsSeverity.textContent = result.severity;
+  DOM.qsConfidence.textContent = `${confidence}%`;
+
+  if (DOM.reason1) DOM.reason1.textContent = result.reason1;
+  if (DOM.reason2) DOM.reason2.textContent = result.reason2;
+  if (DOM.reason3) DOM.reason3.textContent = result.reason3;
+  if (DOM.machineResponsible) DOM.machineResponsible.textContent = result.machine;
+  if (DOM.correctiveSuggestion) DOM.correctiveSuggestion.textContent = result.suggestion;
+
+  addLogEntry(result, confidence, timeStr);
+
+  if (result.status === 'defect') {
+    showToast('error', 'Defect Detected', `${result.label} — Confidence: ${confidence}%`, 6000);
+  } else {
+    showToast('success', 'Inspection Passed', `Fabric sample cleared. Confidence: ${confidence}%`, 5000);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   7. CLEAR / NEXT SCAN
+   ═══════════════════════════════════════════════════════════════ */
+function initClearButton() {
+  if (!DOM.btnClear) return;
+
+  DOM.btnClear.addEventListener('click', () => {
+    appState.currentImage = null;
+    appState.currentResult = null;
+
+    DOM.imagePreview.src = '';
+    DOM.imagePreview.classList.add('hidden');
+    DOM.cameraIdle.classList.remove('hidden');
+
+    DOM.viewResults.classList.remove('active');
+    DOM.viewResults.classList.add('hidden');
+    DOM.viewCapture.classList.add('active');
+    DOM.viewCapture.classList.remove('hidden');
+
+    DOM.processingOverlay.classList.add('hidden');
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    showToast('info', 'Workspace Cleared', 'Ready for the next fabric scan.');
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   8. LOG ENTRIES & ANALYTICS
+   ═══════════════════════════════════════════════════════════════ */
+function addLogEntry(result, confidence, timeStr) {
+  const defectClass = result.key === 'defect_free'
+    ? 'Defect Free'
+    : result.key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+
+  const entry = {
+    id: Date.now(),
+    time: timeStr,
+    defectType: defectClass,
+    machine: result.machine,
+    status: result.status,
+    confidence,
+  };
+  appState.logs.unshift(entry);
+
+  appState.analytics.total++;
+  if (result.status === 'defect') {
+    appState.analytics.defects++;
+  } else {
+    appState.analytics.ok++;
+  }
+
+  updateAnalytics();
+  renderLogsTable();
+
+  if (DOM.logCountBadge) {
+    DOM.logCountBadge.textContent = appState.logs.length;
+    DOM.logCountBadge.setAttribute('aria-label', `${appState.logs.length} log entries`);
   }
 }
 
 function updateAnalytics() {
-  const { total, defects, ok, rate } = appState.analytics;
+  const { total, defects, ok } = appState.analytics;
   DOM.analyticsTotal.textContent = total;
   DOM.analyticsDefects.textContent = defects;
   DOM.analyticsOk.textContent = ok;
-  DOM.analyticsRate.textContent = rate;
+  const rate = total > 0 ? ((defects / total) * 100).toFixed(1) : '0';
+  DOM.analyticsRate.textContent = `${rate}%`;
 }
 
 function renderLogsTable() {
   const tbody = DOM.logsTableBody;
+
+  if (DOM.logsEmptyRow && DOM.logsEmptyRow.parentElement) {
+    DOM.logsEmptyRow.remove();
+  }
+
   Array.from(tbody.querySelectorAll('.log-data-row')).forEach(r => r.remove());
 
   if (appState.logs.length === 0) {
-    if (!tbody.contains(DOM.logsEmptyRow)) tbody.appendChild(DOM.logsEmptyRow);
+    tbody.appendChild(DOM.logsEmptyRow);
     return;
   }
-
-  if (DOM.logsEmptyRow) DOM.logsEmptyRow.remove();
 
   appState.logs.slice(0, 50).forEach((entry) => {
     const tr = document.createElement('tr');
     tr.className = 'log-data-row';
     tr.innerHTML = `
-      <td>${entry.time}</td>
-      <td>${entry.defectType}</td>
-      <td style="font-family: var(--ff-mono); font-size: var(--fs-xs); color: var(--clr-text-secondary);">${entry.machine}</td>
-      <td style="font-family: var(--ff-mono); font-size: var(--fs-xs); color: var(--clr-accent);">${entry.confidence}%</td>
+      <td>${escapeHtml(entry.time)}</td>
+      <td>${escapeHtml(entry.defectType)}</td>
+      <td style="font-family: var(--ff-mono); font-size: var(--fs-xs); color: var(--clr-text-secondary);">${escapeHtml(entry.machine)}</td>
+      <td style="font-family: var(--ff-mono); font-size: var(--fs-xs); color: var(--clr-accent);">${escapeHtml(entry.confidence)}%</td>
       <td>
         <span class="log-status-badge log-status-badge--${entry.status === 'defect' ? 'defect' : 'ok'}">
           ${entry.status === 'defect' ? 'Defect' : 'Clear'}
@@ -475,251 +922,184 @@ function renderLogsTable() {
   });
 }
 
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.appendChild(document.createTextNode(str));
+  return div.innerHTML;
+}
+
 /* ═══════════════════════════════════════════════════════════════
-   4. CAMERA & IMAGE CAPTURE
+   9. CSV EXPORT & LOGS MANAGEMENT
    ═══════════════════════════════════════════════════════════════ */
-DOM.btnOpenCamera.addEventListener('click', async () => {
-  if (appState.isCameraActive) { stopCamera(); return; }
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
+function initLogsListeners() {
+  if (DOM.btnExportCsv) {
+    DOM.btnExportCsv.addEventListener('click', () => {
+      if (appState.logs.length === 0) {
+        showToast('warning', 'No Data', 'No scan logs to export yet.');
+        return;
+      }
+      const headers = ['Time', 'Defect Type', 'Machine', 'Confidence (%)', 'Status'];
+      const rows = appState.logs.map(e => [
+        e.time,
+        e.defectType,
+        e.machine,
+        e.confidence,
+        e.status === 'defect' ? 'Defect Found' : 'Defect Free',
+      ]);
+      const csvContent = [headers, ...rows]
+        .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+        .join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `fabricguard_shift_log_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('success', 'CSV Exported', `${appState.logs.length} records exported successfully.`);
     });
-    appState.cameraStream = stream;
-    appState.isCameraActive = true;
-    DOM.cameraFeed.srcObject = stream;
-    DOM.cameraFeed.classList.remove('hidden');
-    DOM.cameraIdle.classList.add('hidden');
-    DOM.imagePreview.classList.add('hidden');
-    DOM.scanLine.classList.remove('hidden');
-    DOM.btnOpenCamera.innerHTML = `<span class="btn__icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span><span class="btn__label">Stop Camera</span>`;
-    DOM.btnCapturePhoto.classList.remove('hidden');
-    DOM.btnUploadImage.classList.add('hidden');
-  } catch (err) {
-    showToast('error', 'Camera Error', 'Could not access camera device.');
   }
-});
 
-function stopCamera() {
-  if (appState.cameraStream) appState.cameraStream.getTracks().forEach(t => t.stop());
-  appState.isCameraActive = false;
-  DOM.cameraFeed.classList.add('hidden');
-  DOM.scanLine.classList.add('hidden');
-  DOM.btnCapturePhoto.classList.add('hidden');
-  DOM.btnUploadImage.classList.remove('hidden');
-  DOM.cameraIdle.classList.remove('hidden');
-  DOM.btnOpenCamera.innerHTML = `<span class="btn__icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></span><span class="btn__label">Open Device Camera</span>`;
-}
-
-DOM.btnCapturePhoto.addEventListener('click', () => {
-  const canvas = DOM.captureCanvas;
-  canvas.width = DOM.cameraFeed.videoWidth;
-  canvas.height = DOM.cameraFeed.videoHeight;
-  canvas.getContext('2d').drawImage(DOM.cameraFeed, 0, 0);
-  processImage(canvas.toDataURL('image/jpeg'), 'camera');
-  stopCamera();
-});
-
-DOM.btnUploadImage.addEventListener('click', () => DOM.fileInput.click());
-DOM.fileInput.addEventListener('change', (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (ev) => processImage(ev.target.result, 'upload');
-  reader.readAsDataURL(file);
-});
-
-/* ═══════════════════════════════════════════════════════════════
-   5. REAL AI PROCESSING (LINKED TO USER)
-   ═══════════════════════════════════════════════════════════════ */
-async function processImage(imageDataURL, source) {
-  if (appState.isProcessing || !appState.token) {
-    if (!appState.token) showToast('warning', 'Session Expired', 'Please login to perform scans.');
-    return;
-  }
-  appState.isProcessing = true;
-  appState.currentImage = imageDataURL;
-
-  DOM.imagePreview.src = imageDataURL;
-  DOM.imagePreview.classList.remove('hidden');
-  DOM.cameraIdle.classList.add('hidden');
-  DOM.processingOverlay.classList.remove('hidden');
-
-  try {
-    let blob;
-    if (imageDataURL.startsWith('data:')) {
-      // It's already a data URL (from camera or upload)
-      blob = await (await fetch(imageDataURL)).blob();
-    } else {
-      // It's a regular URL (like the demo image), use canvas to avoid CORS/fetch issues
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-        img.src = imageDataURL;
-      });
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      canvas.getContext('2d').drawImage(img, 0, 0);
-      const dataUrl = canvas.toDataURL('image/jpeg');
-      blob = await (await fetch(dataUrl)).blob();
-    }
-
-    const formData = new FormData();
-    formData.append('file', blob, 'capture.jpg');
-
-    const response = await fetch(`${API_BASE}/predict`, {
-      method: 'POST',
-      body: formData,
-      headers: { 'Authorization': `Bearer ${appState.token}` }
+  if (DOM.btnClearLogs) {
+    DOM.btnClearLogs.addEventListener('click', () => {
+      if (appState.logs.length === 0) {
+        showToast('warning', 'Already Clear', 'No logs to clear.');
+        return;
+      }
+      if (!confirm('Clear all shift logs? This action cannot be undone.')) return;
+      appState.logs = [];
+      appState.analytics = { total: 0, defects: 0, ok: 0 };
+      updateAnalytics();
+      renderLogsTable();
+      if (DOM.logCountBadge) {
+        DOM.logCountBadge.textContent = '0';
+        DOM.logCountBadge.setAttribute('aria-label', '0 log entries');
+      }
+      showToast('info', 'Logs Cleared', 'All shift logs have been cleared.');
     });
-
-    if (response.status === 401) {
-      showToast('error', 'Session Expired', 'Your session has ended. Please log in again.');
-      setTimeout(signOut, 2000);
-      return;
-    }
-
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      throw new Error(errData.detail || 'Prediction failed');
-    }
-
-    const apiResult = await response.json();
-    console.log('Prediction success:', apiResult);
-    
-    const uiConfig = DEFECT_DATABASE[apiResult.defect_key] || DEFECT_DATABASE['hole'];
-    
-    const result = {
-      ...apiResult,
-      label: apiResult.status === 'ok' ? 'Status: Defect Free' : `Defect Found: ${apiResult.defect_label}`,
-      icon: uiConfig.icon
-    };
-
-    appState.currentResult = result;
-    showResults(result, apiResult.image_url || imageDataURL, apiResult.confidence);
-    
-    // Refresh history and analytics
-    await Promise.all([fetchHistory(), fetchAnalytics()]);
-
-  } catch (err) {
-    console.error('Processing error:', err);
-    showToast('error', 'Processing Failed', err.message || 'Model backend error.');
-  } finally {
-    DOM.processingOverlay.classList.add('hidden');
-    appState.isProcessing = false;
   }
 }
 
-function showResults(result, imageURL, confidence) {
-  // Hide capture, show results
-  DOM.viewCapture.classList.add('hidden');
-  DOM.viewCapture.classList.remove('active');
-  
-  DOM.viewResults.classList.remove('hidden');
-  DOM.viewResults.classList.add('active');
-  
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-
-  DOM.resultTimestamp.textContent = `Analysis completed at ${new Date().toLocaleTimeString()} — ${new Date().toLocaleDateString()}`;
-  DOM.classificationBanner.className = `classification-banner state--${result.status}`;
-  DOM.classificationIcon.innerHTML = result.icon;
-  DOM.classificationLabel.textContent = result.status === 'ok' ? 'Quality Status' : 'Defect Alert';
-  DOM.classificationValue.textContent = result.label;
-  DOM.confidenceValue.textContent = `${confidence}%`;
-  DOM.resultImage.src = imageURL;
-  DOM.qsDefectType.textContent = result.defect_label;
-  DOM.qsSeverity.textContent = result.severity;
-  DOM.qsConfidence.textContent = `${confidence}%`;
-  DOM.reason1.textContent = result.reason_1;
-  DOM.reason2.textContent = result.reason_2;
-  DOM.reason3.textContent = result.reason_3;
-  DOM.machineResponsible.textContent = result.machine;
-  DOM.correctiveSuggestion.textContent = result.suggestion;
-
-  showToast(result.status === 'defect' ? 'error' : 'success', 
-            result.status === 'defect' ? 'Defect Detected' : 'Inspection Passed', 
-            `${result.label} — Confidence: ${confidence}%`);
-}
-
-DOM.btnClear.addEventListener('click', () => {
-  // Hide results, show capture
-  DOM.viewResults.classList.add('hidden');
-  DOM.viewResults.classList.remove('active');
-  
-  DOM.viewCapture.classList.remove('hidden');
-  DOM.viewCapture.classList.add('active');
-  
-  DOM.imagePreview.src = '';
-  DOM.imagePreview.classList.add('hidden');
-  DOM.cameraIdle.classList.remove('hidden');
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-});
 
 /* ═══════════════════════════════════════════════════════════════
-   6. MISC UI & TOASTS
+   13. TOAST NOTIFICATION SYSTEM
    ═══════════════════════════════════════════════════════════════ */
-function showToast(type, title, message) {
+const TOAST_ICONS = {
+  success: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00e676" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>`,
+  error: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ff3d5c" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
+  warning: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffab00" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+  info: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e8821a" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+};
+
+const toastClassMap = { success: 'success', error: 'error', warning: 'info', info: 'info' };
+
+let toastQueue = [];
+
+function showToast(type, title, message, duration = 4000) {
   const toast = document.createElement('div');
-  toast.className = `toast toast--${type === 'warning' ? 'info' : type}`;
-  toast.innerHTML = `<div class="toast__body"><div class="toast__title">${title}</div><div class="toast__msg">${message}</div></div>`;
+  const cssType = toastClassMap[type] || 'info';
+  toast.className = `toast toast--${cssType}`;
+  toast.setAttribute('role', 'alert');
+
+  toast.innerHTML = `
+    <div class="toast__icon">${TOAST_ICONS[type] || TOAST_ICONS.info}</div>
+    <div class="toast__body">
+      <div class="toast__title">${escapeHtml(title)}</div>
+      <div class="toast__msg">${escapeHtml(message)}</div>
+    </div>`;
+
   DOM.toastContainer.appendChild(toast);
-  setTimeout(() => toast.remove(), 4000);
+  toastQueue.push(toast);
+
+  while (toastQueue.length > 4) {
+    const old = toastQueue.shift();
+    old.remove();
+  }
+
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(8px)';
+    toast.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+    setTimeout(() => {
+      toast.remove();
+      toastQueue = toastQueue.filter(t => t !== toast);
+    }, 320);
+  }, duration);
 }
 
-/* 
-DOM.btnDemoScan.addEventListener('click', () => {
-  const imgUrl = DEMO_IMAGES[0];
-  processImage(imgUrl, 'demo');
-});
-*/
+/* ═══════════════════════════════════════════════════════════════
+   14. DEMO PREFILL
+   ═══════════════════════════════════════════════════════════════ */
+function loadDemoLogs() {
+  const demoEntries = [
+    { time: '08:02:15', defectType: 'Hole', machine: 'Circular Weft Knitter', status: 'defect', confidence: '94.3' },
+    { time: '08:17:44', defectType: 'Defect Free', machine: 'Rapier Loom', status: 'ok', confidence: '97.1' },
+    { time: '08:35:09', defectType: 'Scratch', machine: 'Projectile Loom', status: 'defect', confidence: '88.7' },
+    { time: '08:52:31', defectType: 'Defect Free', machine: 'Circular Weft Knitter', status: 'ok', confidence: '91.5' },
+    { time: '09:11:00', defectType: 'Oil Stain', machine: 'Power Loom', status: 'defect', confidence: '85.2' },
+  ];
+
+  demoEntries.forEach(e => {
+    appState.logs.push({ id: Date.now() + Math.random(), ...e });
+    appState.analytics.total++;
+    if (e.status === 'defect') appState.analytics.defects++;
+    else appState.analytics.ok++;
+  });
+
+  updateAnalytics();
+  renderLogsTable();
+  if (DOM.logCountBadge) {
+    DOM.logCountBadge.textContent = appState.logs.length;
+    DOM.logCountBadge.setAttribute('aria-label', `${appState.logs.length} log entries`);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   15. DEMO QUICK-TEST BUTTON
+   ═══════════════════════════════════════════════════════════════ */
+function initDemoButton() {
+  if (!DOM.btnDemoScan) return;
+
+  DOM.btnDemoScan.addEventListener('click', () => {
+    const imgUrl = DEMO_IMAGES[Math.floor(Math.random() * DEMO_IMAGES.length)];
+    processImage(imgUrl, 'demo');
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   16. SERVICE WORKER REGISTRATION
+   ═══════════════════════════════════════════════════════════════ */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {
+      /* Service worker optional — fail silently */
+    });
+  });
+}
 
 /* ═══════════════════════════════════════════════════════════════
    INIT
    ═══════════════════════════════════════════════════════════════ */
-async function init() {
-  if (appState.token) {
-    // Verify token validity first
-    try {
-      const response = await fetch(`${API_BASE}/users/me`, {
-        headers: { 'Authorization': `Bearer ${appState.token}` }
-      });
-      
-      if (!response.ok) {
-        throw new Error('Session invalid');
-      }
-      
-      const userData = await response.json();
-      appState.user.name = userData.full_name;
-      appState.user.email = userData.email;
-      DOM.profileName.textContent = userData.full_name;
-      
-      // Successfully verified, show app
-      DOM.loginLayout.classList.add('hidden');
-      DOM.loginLayout.classList.remove('active');
-      
-      $('app-layout').classList.remove('hidden');
-      $('app-layout').classList.add('active');
-      
-      DOM.headerRight.classList.remove('hidden');
-      
-      // Ensure capture view is active by default in the app layout
-      DOM.viewCapture.classList.remove('hidden');
-      DOM.viewCapture.classList.add('active');
-      
-      await Promise.all([fetchHistory(), fetchAnalytics()]);
-    } catch (err) {
-      console.warn('Initial session check failed:', err);
-      // Clear invalid session
-      appState.token = null;
-      localStorage.removeItem('fg_token');
-      localStorage.removeItem('fg_user_name');
-      showLoginView();
-    }
-  } else {
-    showLoginView();
-  }
+function init() {
+  // Initialize all event listeners (must happen after DOMContentLoaded)
+  initNetworkStatusListener();
+  initAuthListeners();
+  initProfileDropdownListeners();
+  initLogsPanelListeners();
+  initCameraListeners();
+  initClearButton();
+  initLogsListeners();
+  initDemoButton();
+
+  // Load demo data
+  loadDemoLogs();
+
+  setTimeout(() => {
+    showToast('info', 'System Ready', 'EfficientNetB0 model loaded. Tap "Demo Scan" to try instantly.', 6000);
+  }, 800);
 }
 
 document.addEventListener('DOMContentLoaded', init);

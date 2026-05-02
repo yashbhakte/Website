@@ -34,7 +34,7 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False, # Changed to False for better compatibility with wildcard origins
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -119,6 +119,7 @@ def load_resources():
     print(f"Loading model from {MODEL_PATH}...")
     if os.path.exists(MODEL_PATH):
         model = YOLO(MODEL_PATH)
+        print("Model loaded successfully")
     
     if os.path.exists(EXCEL_PATH):
         try:
@@ -215,6 +216,9 @@ async def predict(
         with open(file_path, "wb") as f:
             f.write(contents)
         
+        # Resize image to save memory on Render's free tier (512MB limit)
+        image.thumbnail((416, 416))
+        
         # Run inference
         results = model.predict(image, verbose=False)
         
@@ -269,7 +273,7 @@ async def predict(
             "reason_3": info.get("reason_3"),
             "machine": info.get("machine"),
             "suggestion": info.get("suggestion"),
-            "image_url": f"http://localhost:8000/uploads/{filename}"
+            "image_url": f"https://fabric-dd.onrender.com/uploads/{filename}"
         }
         
     except Exception as e:
@@ -303,4 +307,9 @@ async def get_analytics(
     }
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    import os
+    import uvicorn
+    # Use PORT environment variable for Render deployment
+    port = int(os.environ.get("PORT", 8000))
+    print(f"Starting server on port {port}...")
+    uvicorn.run(app, host="0.0.0.0", port=port)
