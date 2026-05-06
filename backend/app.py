@@ -117,8 +117,14 @@ def load_resources():
     global model, mapping_data
     print(f"Loading model from {MODEL_PATH}...")
     if os.path.exists(MODEL_PATH):
-        model = YOLO(MODEL_PATH)
-        print("Model loaded successfully")
+        try:
+            model = YOLO(MODEL_PATH)
+            print("Model loaded successfully")
+        except Exception as e:
+            print(f"Error loading model: {e}")
+            model = None
+    else:
+        print(f"Model not found at {MODEL_PATH}")
     
     if os.path.exists(EXCEL_PATH):
         try:
@@ -138,8 +144,32 @@ def load_resources():
 
 @app.on_event("startup")
 async def startup_event():
-    init_db()
-    load_resources()
+    """Minimal startup - only initialize database, not model"""
+    try:
+        init_db()
+        print("Database initialized")
+    except Exception as e:
+        print(f"Error initializing database: {e}")
+    
+    # Load Excel mapping only (lightweight)
+    global mapping_data
+    if os.path.exists(EXCEL_PATH):
+        try:
+            df = pd.read_excel(EXCEL_PATH)
+            for _, row in df.iterrows():
+                defect_name = normalize_defect_name(row['Defect Category'])
+                mapping_data[defect_name] = {
+                    "reason_1": str(row.get('1st Priority (Most Likely)', 'N/A')),
+                    "reason_2": str(row.get('2nd Priority (Check Next )', 'N/A')),
+                    "reason_3": str(row.get('3rd Priority (Rare)', 'N/A')),
+                    "suggestion": str(row.get('Suggestion to reduce future defect', 'N/A')),
+                    "machine": str(row.get('Machine Responsible', 'N/A'))
+                }
+            print("Mapping loaded successfully.")
+        except Exception as e:
+            print(f"Error loading Excel: {e}")
+    
+    # Model will be loaded on first prediction (lazy loading)
 
 @app.get("/")
 async def root():
@@ -201,8 +231,20 @@ async def predict(
     file: UploadFile = File(...), 
     db: Session = Depends(get_db)
 ):
+    global model
+    
+    # Lazy load model on first prediction
     if model is None:
-        raise HTTPException(status_code=503, detail="Model not loaded")
+        print("Loading model on first prediction...")
+        if os.path.exists(MODEL_PATH):
+            try:
+                model = YOLO(MODEL_PATH)
+                print("Model loaded successfully")
+            except Exception as e:
+                print(f"Error loading model: {e}")
+                raise HTTPException(status_code=503, detail=f"Model loading failed: {str(e)}")
+        else:
+            raise HTTPException(status_code=503, detail="Model file not found")
     
     try:
         # Read and process image
