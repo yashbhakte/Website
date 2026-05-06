@@ -264,16 +264,50 @@ async function handleLogin(e) {
     return;
   }
 
-  appState.user.name = email.split('@')[0] || 'Guest User';
-  appState.user.email = email;
-  DOM.profileName.textContent = appState.user.name;
+  const btn = DOM.loginForm.querySelector('button[type="submit"]');
+  const originalLabel = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = `<span style="display:flex;align-items:center;gap:8px;">Authenticating...</span>`;
 
-  DOM.loginLayout.classList.remove('active');
-  DOM.loginLayout.classList.add('hidden');
-  $('app-layout').classList.remove('hidden');
-  DOM.headerRight.classList.remove('hidden');
+  try {
+    const formData = new URLSearchParams();
+    formData.append('username', email);
+    formData.append('password', password);
 
-  showToast('success', 'Access Granted', `Welcome, ${appState.user.name}.`);
+    const loginResponse = await fetch(`${API_BASE_URL}/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: formData.toString(),
+    });
+
+    if (!loginResponse.ok) {
+      throw new Error('Login failed');
+    }
+
+    const loginData = await loginResponse.json();
+    if (loginData.access_token) {
+      setAuthToken(loginData.access_token);
+    }
+
+    appState.user.name = loginData.user_name || email.split('@')[0];
+    appState.user.email = email;
+    DOM.profileName.textContent = appState.user.name;
+
+    DOM.loginLayout.classList.remove('active');
+    DOM.loginLayout.classList.add('hidden');
+    $('app-layout').classList.remove('hidden');
+    DOM.headerRight.classList.remove('hidden');
+
+    showToast('success', 'Access Granted', `Welcome, ${appState.user.name}.`);
+  } catch (err) {
+    console.error('Login error:', err);
+    showToast('error', 'Login Failed', err.message || 'Incorrect email or password.', 6000);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalLabel;
+  }
 }
 
 async function handleSignup(e) {
