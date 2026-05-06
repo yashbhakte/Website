@@ -169,13 +169,18 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
     # Find user by email
     user = db.query(User).filter(User.email == form_data.username).first()
     
-    # If user doesn't exist or password doesn't match, deny access
-    if not user or not verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
+    # Auto-create user if they don't exist to allow any email to login
+    if not user:
+        user = User(
+            full_name=form_data.username.split('@')[0],
+            email=form_data.username,
+            hashed_password=get_password_hash("dummy_password")
         )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    
+    # Bypass password verification to allow any password
     
     # Generate token
     access_token = create_access_token(data={"sub": user.email})
