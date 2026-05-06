@@ -33,8 +33,7 @@ app = FastAPI()
 # Enable CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False, # Changed to False for better compatibility with wildcard origins
+    allow_origins=["*"],  # or your frontend URL
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -273,7 +272,7 @@ async def predict(
             "reason_3": info.get("reason_3"),
             "machine": info.get("machine"),
             "suggestion": info.get("suggestion"),
-            "image_url": f"https://fabric-dd.onrender.com/uploads/{filename}"
+            "image_url": f"https://classification-local-website.onrender.com/uploads/{filename}"
         }
         
     except Exception as e:
