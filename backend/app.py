@@ -199,8 +199,7 @@ async def read_users_me(current_user: User = Depends(get_current_user)):
 @app.post("/predict")
 async def predict(
     file: UploadFile = File(...), 
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    db: Session = Depends(get_db)
 ):
     if model is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
@@ -212,7 +211,7 @@ async def predict(
         
         # Save image to uploads folder
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{current_user.id}_{timestamp}_{file.filename}"
+        filename = f"anonymous_{timestamp}_{file.filename}"
         file_path = os.path.join(UPLOADS_DIR, filename)
         
         # We need to seek back to start if we use the file object, 
@@ -249,7 +248,7 @@ async def predict(
         
         # Save to database
         scan_record = ScanHistory(
-            user_id=current_user.id,
+            user_id=0,
             image_path=f"uploads/{filename}",
             defect_key=defect_key,
             defect_label=predicted_class_raw,
