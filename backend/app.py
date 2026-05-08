@@ -264,19 +264,51 @@ async def predict(
             raise HTTPException(status_code=503, detail="Model file not found")
     
     try:
-        # Read and process image
+        import cv2
         contents = await file.read()
-        image = Image.open(io.BytesIO(contents)).convert("RGB")
-        
-        # Save image to uploads folder
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"anonymous_{timestamp}_{file.filename}"
-        file_path = os.path.join(UPLOADS_DIR, filename)
         
-        # We need to seek back to start if we use the file object, 
-        # but since we already have 'contents', we'll just write it
-        with open(file_path, "wb") as f:
-            f.write(contents)
+        # Check if file is a video
+        is_video = file.filename.lower().endswith(('.mp4', '.avi', '.mov', '.mkv', '.webm')) or (file.content_type and file.content_type.startswith('video/'))
+        
+        if is_video:
+            # Save the video file
+            video_filename = f"anonymous_{timestamp}_{file.filename}"
+            video_path = os.path.join(UPLOADS_DIR, video_filename)
+            with open(video_path, "wb") as f:
+                f.write(contents)
+                
+            # Extract frame using OpenCV
+            cap = cv2.VideoCapture(video_path)
+            ret = False
+            # Read 10th frame to avoid black screens at start
+            for _ in range(10):
+                ret, frame = cap.read()
+                if not ret:
+                    break
+            if not ret:
+                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                ret, frame = cap.read()
+            cap.release()
+            
+            if not ret:
+                raise HTTPException(status_code=400, detail="Could not read any frames from the uploaded video.")
+                
+            # Convert BGR to RGB
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            image = Image.fromarray(frame_rgb)
+            
+            # Save frame as analyzed image
+            filename = f"frame_{timestamp}_{os.path.splitext(file.filename)[0]}.jpg"
+            file_path = os.path.join(UPLOADS_DIR, filename)
+            image.save(file_path)
+        else:
+            # Process as standard image
+            image = Image.open(io.BytesIO(contents)).convert("RGB")
+            filename = f"anonymous_{timestamp}_{file.filename}"
+            file_path = os.path.join(UPLOADS_DIR, filename)
+            with open(file_path, "wb") as f:
+                f.write(contents)
         
         # Resize image to save memory on Render's free tier (512MB limit)
         image.thumbnail((416, 416))

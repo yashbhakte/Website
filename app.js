@@ -93,6 +93,8 @@ const appState = {
   logs: [],
   analytics: { total: 0, defects: 0, ok: 0 },
   user: { name: 'John Doe', email: '' },
+  batchResults: [],
+  currentBatchIndex: 0,
 };
 
 /* ─────────────────────────────────────────────────────────────
@@ -167,6 +169,10 @@ const DOM = {
   btnGeneratePdf: $('btn-generate-pdf'),
   btnClear: $('btn-clear'),
   toastContainer: $('toast-container'),
+  batchNavigationPanel: $('batch-navigation-panel'),
+  batchCounter: $('batch-counter'),
+  btnBatchPrev: $('btn-batch-prev'),
+  btnBatchNext: $('btn-batch-next'),
 
   shiftLogsPanel: $('shift-logs-panel'),
   logsClose: $('logs-close'),
@@ -538,19 +544,21 @@ function initCameraListeners() {
 
   if (DOM.fileInput) {
     DOM.fileInput.addEventListener('change', (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      if (!file.type.startsWith('image/')) {
-        showToast('error', 'Invalid File', 'Please select a valid image file (JPEG, PNG, TIFF, etc.).');
-        return;
+      const files = Array.from(e.target.files || []).slice(0, 10);
+      if (files.length === 0) return;
+      
+      for (const file of files) {
+        if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+          showToast('error', 'Invalid File', 'Please select valid image or video files.');
+          return;
+        }
+        if (file.size > 50 * 1024 * 1024) {
+          showToast('error', 'File Too Large', 'Maximum file size is 50 MB.');
+          return;
+        }
       }
-      if (file.size > 20 * 1024 * 1024) {
-        showToast('error', 'File Too Large', 'Maximum image size is 20 MB.');
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = (ev) => processImage(ev.target.result, 'upload');
-      reader.readAsDataURL(file);
+      
+      processBatch(files);
       e.target.value = '';
     });
   }
@@ -612,6 +620,112 @@ function buildDemoResult() {
   };
 }
 
+async function processBatch(files) {
+  if (appState.isProcessing) return;
+  appState.isProcessing = true;
+  appState.batchResults = [];
+  appState.currentBatchIndex = 0;
+
+  DOM.imagePreview.src = '';
+  DOM.imagePreview.classList.add('hidden');
+  DOM.cameraIdle.classList.add('hidden');
+  DOM.processingOverlay.classList.remove('hidden');
+
+  const modelNameEl = DOM.processingOverlay.querySelector('.processing-model-name');
+
+  try {
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      modelNameEl.textContent = `Processing Sample ${i + 1} of ${files.length}...`;
+
+      const fileDataURL = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = (ev) => resolve(ev.target.result);
+        r.onerror = (err) => reject(err);
+        r.readAsDataURL(file);
+      });
+
+      let blob;
+      if (fileDataURL.startsWith('data:')) {
+        blob = dataURLtoBlob(fileDataURL);
+      } else {
+        const response = await fetch(fileDataURL);
+        blob = await response.blob();
+      }
+
+      const formData = new FormData();
+      const fileExt = blob.type.startsWith('video/') ? 'video.mp4' : 'capture.jpg';
+      formData.append('file', blob, fileExt);
+
+      const token = getAuthToken();
+      const headers = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/predict`, {
+        method: 'POST',
+        headers: headers,
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed on sample ${i + 1}: ${response.status}`);
+      }
+
+      const apiResult = await response.json();
+      const uiConfig = DEFECT_DATABASE[apiResult.defect_key] || DEFECT_DATABASE['hole'];
+
+      const result = {
+        key: apiResult.defect_key,
+        label: apiResult.status === 'ok'
+          ? 'Status: Defect Free'
+          : `Defect Found: ${apiResult.defect_label}`,
+        status: apiResult.status,
+        severity: apiResult.severity,
+        icon: uiConfig.icon,
+        reason1: apiResult.reason_1,
+        reason2: apiResult.reason_2,
+        reason3: apiResult.reason_3,
+        machine: apiResult.machine,
+        suggestion: apiResult.suggestion,
+        confidence: apiResult.confidence,
+        source: 'upload'
+      };
+
+      appState.batchResults.push({
+        result: result,
+        imageURL: fileDataURL.startsWith('data:video') ? apiResult.image_url : fileDataURL,
+        confidence: apiResult.confidence
+      });
+    }
+
+    DOM.processingOverlay.classList.add('hidden');
+    appState.isProcessing = false;
+
+    if (appState.batchResults.length > 0) {
+      appState.currentBatchIndex = 0;
+      const first = appState.batchResults[0];
+      appState.currentResult = first.result;
+
+      if (appState.batchResults.length > 1) {
+        DOM.batchNavigationPanel.classList.remove('hidden');
+        DOM.batchCounter.textContent = `Sample 1 of ${appState.batchResults.length}`;
+      } else {
+        DOM.batchNavigationPanel.classList.add('hidden');
+      }
+
+      showResults(first.result, first.imageURL, first.result.confidence);
+    }
+
+  } catch (err) {
+    console.error('Batch processing error:', err);
+    DOM.processingOverlay.classList.add('hidden');
+    appState.isProcessing = false;
+    showToast('error', 'Batch Scan Failed', err.message || 'Could not connect to backend server.', 8000);
+  }
+}
+
 async function processImage(imageDataURL, source) {
   if (appState.isProcessing) return;
   appState.isProcessing = true;
@@ -649,7 +763,8 @@ async function processImage(imageDataURL, source) {
     }
 
     const formData = new FormData();
-    formData.append('file', blob, 'capture.jpg');
+    const fileExt = blob.type.startsWith('video/') ? 'video.mp4' : 'capture.jpg';
+    formData.append('file', blob, fileExt);
 
     const token = getAuthToken();
     const headers = {};
@@ -781,6 +896,12 @@ function initClearButton() {
   DOM.btnClear.addEventListener('click', () => {
     appState.currentImage = null;
     appState.currentResult = null;
+    appState.batchResults = [];
+    appState.currentBatchIndex = 0;
+
+    if (DOM.batchNavigationPanel) {
+      DOM.batchNavigationPanel.classList.add('hidden');
+    }
 
     DOM.imagePreview.src = '';
     DOM.imagePreview.classList.add('hidden');
@@ -796,6 +917,34 @@ function initClearButton() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
     showToast('info', 'Workspace Cleared', 'Ready for the next fabric scan.');
   });
+}
+
+function initBatchNavigation() {
+  if (DOM.btnBatchPrev) {
+    DOM.btnBatchPrev.addEventListener('click', () => {
+      if (appState.batchResults.length <= 1) return;
+      if (appState.currentBatchIndex > 0) {
+        appState.currentBatchIndex--;
+        const item = appState.batchResults[appState.currentBatchIndex];
+        appState.currentResult = item.result;
+        DOM.batchCounter.textContent = `Sample ${appState.currentBatchIndex + 1} of ${appState.batchResults.length}`;
+        showResults(item.result, item.imageURL, item.result.confidence);
+      }
+    });
+  }
+
+  if (DOM.btnBatchNext) {
+    DOM.btnBatchNext.addEventListener('click', () => {
+      if (appState.batchResults.length <= 1) return;
+      if (appState.currentBatchIndex < appState.batchResults.length - 1) {
+        appState.currentBatchIndex++;
+        const item = appState.batchResults[appState.currentBatchIndex];
+        appState.currentResult = item.result;
+        DOM.batchCounter.textContent = `Sample ${appState.currentBatchIndex + 1} of ${appState.batchResults.length}`;
+        showResults(item.result, item.imageURL, item.result.confidence);
+      }
+    });
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -1042,6 +1191,7 @@ function init() {
   initLogsPanelListeners();
   initCameraListeners();
   initClearButton();
+  initBatchNavigation();
   initLogsListeners();
   initDemoButton();
 

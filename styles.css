@@ -42,10 +42,11 @@
   --clr-p3-bg: rgba(255, 213, 79, 0.15);
 
   /* Text */
-  --clr-text-primary: #f0ebe4;
-  --clr-text-secondary: #9e8e78;
-  --clr-text-tertiary: #5e4e38;
-  --clr-text-inverse: #120d06;
+  --clr-text-primary: #ffffff;      /* Crisp pure white for values and main headers */
+  --clr-text-secondary: #e2d9cd;    /* Bright platinum sand for readable secondary text and card titles */
+  --clr-text-tertiary: #a69988;     /* Clear soft sand grey for high-contrast labels and subtitles */
+  --clr-text-inverse: #0c0a08;
+
 
   /* Typography */
   --ff-body: 'Inter', system-ui, -apple-system, sans-serif;
@@ -438,16 +439,32 @@ h4 {
   display: block;
 }
 
-.view--capture.active,
+.view--capture.active {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  background: var(--clr-bg-base);
+  position: relative;
+  z-index: 5;
+}
+
 .view--results.active {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
   background: var(--clr-bg-base);
-  /* Ensure no transparency issues */
   position: relative;
   z-index: 5;
+}
+
+@media (min-width: 720px) {
+  .view--results.active {
+    height: calc(100dvh - var(--header-h) - var(--sp-4));
+    max-height: calc(100dvh - var(--header-h) - var(--sp-4));
+    overflow: hidden;
+  }
 }
 
 /* ── SECTION HEADER ───────────────────────────────────────────── */
@@ -1090,13 +1107,17 @@ h4 {
 .results-body {
   display: grid;
   grid-template-columns: 1fr;
-  gap: var(--sp-6);
+  gap: var(--sp-4);
   margin-bottom: var(--sp-6);
 }
 
 @media (min-width: 720px) {
   .results-body {
-    grid-template-columns: 280px 1fr;
+    grid-template-columns: 440px 1fr;
+    margin-bottom: 0;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
   }
 }
 
@@ -1112,8 +1133,16 @@ h4 {
   border-radius: var(--r-lg);
   overflow: hidden;
   background: var(--clr-bg-deep);
-  border: 1px solid var(--clr-border);
+  border: 1px solid rgba(232, 130, 26, 0.17); /* Soft glowing border */
   aspect-ratio: 4/3;
+  box-shadow: 0 0 12px rgba(232, 130, 26, 0.08), var(--shadow-card); /* Soft glowing shadow */
+  transition: border-color var(--transition-base), box-shadow var(--transition-base), transform var(--transition-base);
+}
+
+.results-image-frame:hover {
+  border-color: rgba(232, 130, 26, 0.35);
+  box-shadow: 0 0 16px rgba(232, 130, 26, 0.12), var(--shadow-card);
+  transform: translateY(-2px);
 }
 
 .result-img {
@@ -1151,9 +1180,17 @@ h4 {
   align-items: center;
   text-align: center;
   padding: var(--sp-3) var(--sp-2);
-  background: var(--clr-bg-elevated);
-  border: 1px solid var(--clr-border);
+  background: var(--clr-bg-base); /* Matches website background color */
+  border: 1px solid rgba(232, 130, 26, 0.17); /* 10% softer glowing border */
   border-radius: var(--r-md);
+  box-shadow: 0 0 12px rgba(232, 130, 26, 0.08), var(--shadow-card); /* 10% softer glowing shadow */
+  transition: border-color var(--transition-base), box-shadow var(--transition-base), transform var(--transition-base);
+}
+
+.quick-stat:hover {
+  border-color: rgba(232, 130, 26, 0.35);
+  box-shadow: 0 0 16px rgba(232, 130, 26, 0.12), var(--shadow-card);
+  transform: translateY(-2px);
 }
 
 .quick-stat__value {
@@ -1194,6 +1231,9 @@ h4 {
 @media (min-width: 720px) {
   .data-cards {
     grid-template-columns: 1fr;
+    overflow-y: auto;
+    max-height: 100%;
+    padding-right: 6px;
   }
 }
 
@@ -1204,17 +1244,18 @@ h4 {
 }
 
 .data-card {
-  background: var(--clr-bg-card);
-  border: 1px solid var(--clr-border);
+  background: var(--clr-bg-base); /* Matches website background color */
+  border: 1px solid rgba(232, 130, 26, 0.17); /* 10% softer glowing border */
   border-radius: var(--r-lg);
   padding: var(--sp-4) var(--sp-5);
-  box-shadow: var(--shadow-card);
-  transition: border-color var(--transition-base), box-shadow var(--transition-base);
+  box-shadow: 0 0 12px rgba(232, 130, 26, 0.08), var(--shadow-card); /* 10% softer glowing shadow */
+  transition: border-color var(--transition-base), box-shadow var(--transition-base), transform var(--transition-base);
 }
 
 .data-card:hover {
-  border-color: var(--clr-border-glow);
-  box-shadow: var(--glow-accent), var(--shadow-card);
+  border-color: rgba(232, 130, 26, 0.35);
+  box-shadow: 0 0 16px rgba(232, 130, 26, 0.12), var(--shadow-card);
+  transform: translateY(-2px);
 }
 
 .data-card--action {
@@ -1850,9 +1891,8 @@ h4 {
   }
 }
 
-/* ══════════════════════════════════════════════════════════════
-   GRID BACKGROUND TEXTURE
-   ══════════════════════════════════════════════════════════════ */
+/* Grid background disabled per requirements */
+/*
 body::before {
   content: '';
   position: fixed;
@@ -1864,6 +1904,7 @@ body::before {
   pointer-events: none;
   z-index: 0;
 }
+*/
 
 .app-header,
 .primary-content,

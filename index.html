@@ -25,46 +25,35 @@
     <div class="header-inner">
       <!-- Logo / Brand -->
       <div class="brand-container" id="brand-container">
-        <div class="brand" aria-label="NeuAI Technologies FabricGuard">
-          <div class="brand-icon" aria-hidden="true">
-            <!-- Modern NEUAI Technologies Brain-Circuit Logo SVG -->
-            <svg width="44" height="44" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <div class="brand" aria-label="NeuAI Technologies FabricGuard" style="display: flex; align-items: center;">
+          <div class="brand-icon" style="display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin-right: 12px;">
+            <!-- Self-Contained NEUAI Technologies Brain-Circuit Logo SVG -->
+            <svg width="42" height="42" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
               <!-- Left Side: Orange Brain Lobe (Angular Cells) -->
-              <path
-                d="M44,15 L32,15 L20,27 L20,50 L32,62 L44,62 M32,15 L38,27 L32,38 L44,38 M20,38 L32,38 M20,50 L26,56 L38,56 M26,56 L20,62 L32,74 L44,74 M32,74 L38,85 L44,85"
-                stroke="#e8821a" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
-
+              <path d="M44,15 L32,15 L20,27 L20,50 L32,62 L44,62 M32,15 L38,27 L32,38 L44,38 M20,38 L32,38 M20,50 L26,56 L38,56 M26,56 L20,62 L32,74 L44,74 M32,74 L38,85 L44,85" 
+                    stroke="#e8821a" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+              
               <!-- Right Side: Copper/Bronze Circuit Lobe -->
               <!-- Vertical Trunk -->
-              <line x1="50" y1="15" x2="50" y2="85" stroke="#a88265" stroke-width="5.5" stroke-linecap="round" />
+              <line x1="50" y1="15" x2="50" y2="85" stroke="#a88265" stroke-width="6" stroke-linecap="round" />
               <!-- Top Branch -->
-              <path d="M50,25 L65,25 L75,15" stroke="#a88265" stroke-width="4.5" stroke-linecap="round"
-                stroke-linejoin="round" fill="none" />
-              <circle cx="75" cy="15" r="4.5" fill="#a88265" />
+              <path d="M50,25 L65,25 L75,15" stroke="#a88265" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+              <circle cx="75" cy="15" r="5" fill="#a88265" />
               <!-- Upper Mid Branch -->
-              <path d="M50,42 L70,42 L82,54" stroke="#a88265" stroke-width="4.5" stroke-linecap="round"
-                stroke-linejoin="round" fill="none" />
-              <circle cx="82" cy="54" r="4.5" fill="#a88265" />
+              <path d="M50,42 L70,42 L82,54" stroke="#a88265" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+              <circle cx="82" cy="54" r="5" fill="#a88265" />
               <!-- Lower Mid Branch -->
-              <path d="M50,60 L75,60" stroke="#a88265" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"
-                fill="none" />
-              <circle cx="75" cy="60" r="4.5" fill="#a88265" />
+              <path d="M50,60 L75,60" stroke="#a88265" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+              <circle cx="75" cy="60" r="5" fill="#a88265" />
               <!-- Bottom Branch -->
-              <path d="M50,75 L65,75 L75,85" stroke="#a88265" stroke-width="4.5" stroke-linecap="round"
-                stroke-linejoin="round" fill="none" />
-              <circle cx="75" cy="85" r="4.5" fill="#a88265" />
+              <path d="M50,75 L65,75 L75,85" stroke="#a88265" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+              <circle cx="75" cy="85" r="5" fill="#a88265" />
             </svg>
           </div>
-          <div class="brand-text"
-            style="display: flex; flex-direction: column; justify-content: center; margin-left: 10px;">
-            <div style="display: flex; flex-direction: column; line-height: 1.1;">
-              <span class="brand-name" style="font-size: 20px; font-weight: 800; letter-spacing: 0.5px;"><span
-                  style="color: #f0ebe4;">NEU</span><span style="color: #e8821a;">AI</span></span>
-              <span class="brand-name-tech"
-                style="color: #a88265; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;">Technologies</span>
-            </div>
-            <span class="brand-sub"
-              style="font-size: 9px; color: #e8821a; opacity: 0.9; letter-spacing: 2px; text-transform: uppercase; margin-top: 1px;">FabricGuard</span>
+          <div class="brand-text" style="display: flex; flex-direction: column; justify-content: center; line-height: 1.1;">
+            <span class="brand-name" style="font-size: 20px; font-weight: 800; letter-spacing: 0.5px; display: block; margin-bottom: -1px;"><span style="color: #f0ebe4;">NEU</span><span style="color: #e8821a;">AI</span></span>
+            <span class="brand-name-tech" style="color: #a88265; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; display: block; margin-bottom: 2px;">Technologies</span>
+            <span class="brand-sub" style="font-size: 9px; color: #e8821a; opacity: 0.95; letter-spacing: 2.5px; text-transform: uppercase; display: block; font-weight: 700;">FabricGuard</span>
           </div>
         </div>
       </div>
@@ -127,9 +116,38 @@
 
         <!-- ══ VIEW: SIGN IN ══ -->
         <div class="auth-view active" id="login-view">
-          <div class="login-card__header">
+          <div class="login-card__header" style="text-align: center; display: flex; flex-direction: column; align-items: center;">
+            <div class="brand" style="display: flex; align-items: center; margin-bottom: 24px;">
+              <div class="brand-icon" style="display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin-right: 12px;">
+                <!-- Self-Contained NEUAI Technologies Brain-Circuit Logo SVG -->
+                <svg width="42" height="42" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <!-- Left Side: Orange Brain Lobe (Angular Cells) -->
+                  <path d="M44,15 L32,15 L20,27 L20,50 L32,62 L44,62 M32,15 L38,27 L32,38 L44,38 M20,38 L32,38 M20,50 L26,56 L38,56 M26,56 L20,62 L32,74 L44,74 M32,74 L38,85 L44,85" 
+                        stroke="#e8821a" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+                  <!-- Right Side: Copper/Bronze Circuit Lobe -->
+                  <!-- Vertical Trunk -->
+                  <line x1="50" y1="15" x2="50" y2="85" stroke="#a88265" stroke-width="6" stroke-linecap="round" />
+                  <!-- Top Branch -->
+                  <path d="M50,25 L65,25 L75,15" stroke="#a88265" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+                  <circle cx="75" cy="15" r="5" fill="#a88265" />
+                  <!-- Upper Mid Branch -->
+                  <path d="M50,42 L70,42 L82,54" stroke="#a88265" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+                  <circle cx="82" cy="54" r="5" fill="#a88265" />
+                  <!-- Lower Mid Branch -->
+                  <path d="M50,60 L75,60" stroke="#a88265" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+                  <circle cx="75" cy="60" r="5" fill="#a88265" />
+                  <!-- Bottom Branch -->
+                  <path d="M50,75 L65,75 L75,85" stroke="#a88265" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+                  <circle cx="75" cy="85" r="5" fill="#a88265" />
+                </svg>
+              </div>
+              <div class="brand-text" style="display: flex; flex-direction: column; justify-content: center; line-height: 1.1; text-align: left;">
+                <span class="brand-name" style="font-size: 20px; font-weight: 800; letter-spacing: 0.5px; display: block; margin-bottom: -1px;"><span style="color: #f0ebe4;">NEU</span><span style="color: #e8821a;">AI</span></span>
+                <span class="brand-name-tech" style="color: #a88265; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; display: block;">Technologies</span>
+              </div>
+            </div>
             <h2 class="login-card__title">Login to FabricGuard</h2>
-            <p class="login-card__subtitle">Sign in to access AI-powered fabric inspection and diagnostic analysis.</p>
+            <p class="login-card__subtitle" style="margin-top: 4px;">Sign in to access AI-powered fabric inspection and diagnostic analysis.</p>
           </div>
 
           <form class="login-form" id="login-form">
@@ -192,9 +210,38 @@
 
         <!-- ══ VIEW: CREATE ACCOUNT ══ -->
         <div class="auth-view hidden" id="signup-view">
-          <div class="login-card__header">
+          <div class="login-card__header" style="text-align: center; display: flex; flex-direction: column; align-items: center;">
+            <div class="brand" style="display: flex; align-items: center; margin-bottom: 24px;">
+              <div class="brand-icon" style="display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin-right: 12px;">
+                <!-- Self-Contained NEUAI Technologies Brain-Circuit Logo SVG -->
+                <svg width="42" height="42" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <!-- Left Side: Orange Brain Lobe (Angular Cells) -->
+                  <path d="M44,15 L32,15 L20,27 L20,50 L32,62 L44,62 M32,15 L38,27 L32,38 L44,38 M20,38 L32,38 M20,50 L26,56 L38,56 M26,56 L20,62 L32,74 L44,74 M32,74 L38,85 L44,85" 
+                        stroke="#e8821a" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+                  <!-- Right Side: Copper/Bronze Circuit Lobe -->
+                  <!-- Vertical Trunk -->
+                  <line x1="50" y1="15" x2="50" y2="85" stroke="#a88265" stroke-width="6" stroke-linecap="round" />
+                  <!-- Top Branch -->
+                  <path d="M50,25 L65,25 L75,15" stroke="#a88265" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+                  <circle cx="75" cy="15" r="5" fill="#a88265" />
+                  <!-- Upper Mid Branch -->
+                  <path d="M50,42 L70,42 L82,54" stroke="#a88265" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+                  <circle cx="82" cy="54" r="5" fill="#a88265" />
+                  <!-- Lower Mid Branch -->
+                  <path d="M50,60 L75,60" stroke="#a88265" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+                  <circle cx="75" cy="60" r="5" fill="#a88265" />
+                  <!-- Bottom Branch -->
+                  <path d="M50,75 L65,75 L75,85" stroke="#a88265" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+                  <circle cx="75" cy="85" r="5" fill="#a88265" />
+                </svg>
+              </div>
+              <div class="brand-text" style="display: flex; flex-direction: column; justify-content: center; line-height: 1.1; text-align: left;">
+                <span class="brand-name" style="font-size: 20px; font-weight: 800; letter-spacing: 0.5px; display: block; margin-bottom: -1px;"><span style="color: #f0ebe4;">NEU</span><span style="color: #e8821a;">AI</span></span>
+                <span class="brand-name-tech" style="color: #a88265; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; display: block;">Technologies</span>
+              </div>
+            </div>
             <h2 class="login-card__title">Create Account</h2>
-            <p class="login-card__subtitle">Join FabricGuard to start your AI fabric inspection journey.</p>
+            <p class="login-card__subtitle" style="margin-top: 4px;">Join FabricGuard to start your AI fabric inspection journey.</p>
           </div>
 
           <form class="login-form" id="signup-form">
@@ -249,9 +296,38 @@
 
         <!-- ══ VIEW: FORGOT PASSWORD ══ -->
         <div class="auth-view hidden" id="forgot-view">
-          <div class="login-card__header">
+          <div class="login-card__header" style="text-align: center; display: flex; flex-direction: column; align-items: center;">
+            <div class="brand" style="display: flex; align-items: center; margin-bottom: 24px;">
+              <div class="brand-icon" style="display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin-right: 12px;">
+                <!-- Self-Contained NEUAI Technologies Brain-Circuit Logo SVG -->
+                <svg width="42" height="42" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <!-- Left Side: Orange Brain Lobe (Angular Cells) -->
+                  <path d="M44,15 L32,15 L20,27 L20,50 L32,62 L44,62 M32,15 L38,27 L32,38 L44,38 M20,38 L32,38 M20,50 L26,56 L38,56 M26,56 L20,62 L32,74 L44,74 M32,74 L38,85 L44,85" 
+                        stroke="#e8821a" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+                  <!-- Right Side: Copper/Bronze Circuit Lobe -->
+                  <!-- Vertical Trunk -->
+                  <line x1="50" y1="15" x2="50" y2="85" stroke="#a88265" stroke-width="6" stroke-linecap="round" />
+                  <!-- Top Branch -->
+                  <path d="M50,25 L65,25 L75,15" stroke="#a88265" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+                  <circle cx="75" cy="15" r="5" fill="#a88265" />
+                  <!-- Upper Mid Branch -->
+                  <path d="M50,42 L70,42 L82,54" stroke="#a88265" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+                  <circle cx="82" cy="54" r="5" fill="#a88265" />
+                  <!-- Lower Mid Branch -->
+                  <path d="M50,60 L75,60" stroke="#a88265" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+                  <circle cx="75" cy="60" r="5" fill="#a88265" />
+                  <!-- Bottom Branch -->
+                  <path d="M50,75 L65,75 L75,85" stroke="#a88265" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+                  <circle cx="75" cy="85" r="5" fill="#a88265" />
+                </svg>
+              </div>
+              <div class="brand-text" style="display: flex; flex-direction: column; justify-content: center; line-height: 1.1; text-align: left;">
+                <span class="brand-name" style="font-size: 20px; font-weight: 800; letter-spacing: 0.5px; display: block; margin-bottom: -1px;"><span style="color: #f0ebe4;">NEU</span><span style="color: #e8821a;">AI</span></span>
+                <span class="brand-name-tech" style="color: #a88265; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; display: block;">Technologies</span>
+              </div>
+            </div>
             <h2 class="login-card__title">Reset Password</h2>
-            <p class="login-card__subtitle">Enter your email to receive a password reset OTP.</p>
+            <p class="login-card__subtitle" style="margin-top: 4px;">Enter your email to receive a password reset OTP.</p>
           </div>
 
           <form class="login-form" id="forgot-form">
@@ -422,7 +498,7 @@
         </div>
 
         <!-- Hidden file input -->
-        <input type="file" id="file-input" accept="image/*" class="visually-hidden" aria-label="Select image file" />
+        <input type="file" id="file-input" accept="image/*,video/*" class="visually-hidden" aria-label="Select image or video file" multiple />
 
         <!-- Hidden canvas for camera capture -->
         <canvas id="capture-canvas" class="visually-hidden" aria-hidden="true"></canvas>
@@ -432,16 +508,28 @@
       <div class="view view--results hidden" id="view-results" role="region" aria-label="Diagnostic results">
 
         <!-- Results Header -->
-        <div class="section-header">
-          <div class="section-header__icon" aria-hidden="true">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-            </svg>
+        <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+          <div style="display: flex; align-items: center; gap: 16px;">
+            <div class="section-header__icon" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+              </svg>
+            </div>
+            <div>
+              <h2 class="section-title">Diagnostic Results</h2>
+              <p class="section-sub" id="result-timestamp">Analysis completed at —</p>
+            </div>
           </div>
-          <div>
-            <h2 class="section-title">Diagnostic Results</h2>
-            <p class="section-sub" id="result-timestamp">Analysis completed at —</p>
-          </div>
+          
+          <button class="btn btn--clear btn--small" id="btn-clear" aria-label="Clear results and start next scan" style="padding: 8px 16px; font-size: 13px; font-weight: 700;">
+            <span class="btn__icon" aria-hidden="true">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="1 4 1 10 7 10" />
+                <path d="M3.51 15a9 9 0 1 0 .49-3.24" />
+              </svg>
+            </span>
+            Clear / Next Scan
+          </button>
         </div>
 
         <!-- Classification Banner -->
@@ -555,35 +643,23 @@
               <p class="data-card__value" id="corrective-suggestion">—</p>
             </div>
 
+            <!-- Batch Navigation Panel (aligned right, under suggestion box) -->
+            <div id="batch-navigation-panel" class="hidden" style="display: flex; justify-content: flex-end; align-items: center; gap: 16px; margin-top: 20px; width: 100%;">
+              <span id="batch-counter" style="font-size: 13px; font-weight: 700; color: var(--clr-text-secondary);">Sample 1 of 1</span>
+              <div style="display: flex; gap: 8px;">
+                <button class="btn btn--small" id="btn-batch-prev" aria-label="Previous image" style="padding: 8px 16px; font-size: 13px; font-weight: 700; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: var(--clr-text-primary); border-radius: var(--r-md); cursor: pointer;">
+                  ← Previous
+                </button>
+                <button class="btn btn--small" id="btn-batch-next" aria-label="Next image" style="padding: 8px 16px; font-size: 13px; font-weight: 700; background: var(--clr-accent); color: var(--clr-text-inverse); border: none; border-radius: var(--r-md); cursor: pointer;">
+                  Next Image →
+                </button>
+              </div>
+            </div>
+
           </div>
         </div>
 
-        <!-- Results Action Row -->
-        <div class="results-actions" role="group" aria-label="Result actions">
-          <!-- ERP Logging (Commented out for refinement) -->
-          <!-- 
-          <button class="btn btn--erp" id="btn-log-erp" aria-label="Log result to ERP system">
-            <span class="btn__icon" aria-hidden="true">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <ellipse cx="12" cy="5" rx="9" ry="3" />
-                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
-                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
-              </svg>
-            </span>
-            Log to ERP
-          </button>
-          -->
 
-          <button class="btn btn--clear" id="btn-clear" aria-label="Clear results and start next scan">
-            <span class="btn__icon" aria-hidden="true">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="1 4 1 10 7 10" />
-                <path d="M3.51 15a9 9 0 1 0 .49-3.24" />
-              </svg>
-            </span>
-            Clear / Next Scan
-          </button>
-        </div>
 
 
 
