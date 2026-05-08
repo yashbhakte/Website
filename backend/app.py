@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, status
+from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 # pyrefly: ignore [missing-import]
@@ -244,6 +244,7 @@ async def read_users_me(current_user = Depends(get_current_user)):
 
 @app.post("/predict")
 async def predict(
+    request: Request,
     file: UploadFile = File(...), 
     db = Depends(get_db)
 ):
@@ -332,7 +333,7 @@ async def predict(
             "reason_3": info.get("reason_3"),
             "machine": info.get("machine"),
             "suggestion": info.get("suggestion"),
-            "image_url": f"http://127.0.0.1:8000/uploads/{filename}"
+            "image_url": f"{str(request.base_url).rstrip('/')}/uploads/{filename}"
         }
         
     except Exception as e:
