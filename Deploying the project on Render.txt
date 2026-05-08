@@ -1,0 +1,37 @@
+Backend
+
+Build Command:
+Python =  pip install -r requirements.txt
+Node =  npm install
+
+Start Command:
+FastAPI =  uvicorn app:app --host 0.0.0.0 --port 10000             (main = your file name["app" as i have app.py"])  
+Flask =  python app.py
+Node =  node server.js
+
+{DEPLOY}
+---------------------------------------------------------
+Change the API_URL "https://classification-local-website.onrender.com" in frontend and push it on github
+
+ERROR (Might be):⚠️ Important (CORS issue)
+
+If using FastAPI:
+
+from fastapi.middleware.cors import CORSMiddleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # or your frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+---------------------------------------------------------
+
+Frontend 
+
+Publish Directory : " . "
+
+{DEPLOY}
+
+---------------------------------------------------------

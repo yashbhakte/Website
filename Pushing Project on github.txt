@@ -1,3 +1,10 @@
+If in different Repository:
+= git remote remove origin
+
+= git remote add origin https://github.com/yashbhakte/YOUR-NEW-REPO.git
+
+= git remote set-url origin https://github.com/yashbhakte/new-repo-name.git  (just to change or to replace it with actual repos)
+
 Make sure you are inside your project folder:
 = pwd
 
@@ -5,8 +12,9 @@ Make sure you are inside your project folder:
 
 = git add .
 
-= git commit -m "Fixed CORS, auth token, predict API and frontend flow"
+= git commit -m "Update"
 
 = git branch -M main
 
 = git push -u origin main
+

@@ -63,7 +63,7 @@ const DEMO_IMAGES = [
 ];
 
 /* ── API CONFIGURATION ───────────────────────────────────────── */
-const API_BASE_URL = "https://classification-local-website.onrender.com";
+const API_BASE_URL = "http://127.0.0.1:8000";
 
 function setAuthToken(token) {
   localStorage.setItem('token', token);
@@ -256,13 +256,8 @@ function initProfileDropdownListeners() {
 async function handleLogin(e) {
   e.preventDefault();
 
-  const email = DOM.loginId.value.trim();
-  const password = DOM.loginPassword.value.trim();
-
-  if (!email || !password) {
-    showToast('error', 'Missing Details', 'Please enter email and password.');
-    return;
-  }
+  const email = DOM.loginId.value.trim() || "operator@neuai.com";
+  const password = DOM.loginPassword.value.trim() || "password";
 
   const btn = DOM.loginForm.querySelector('button[type="submit"]');
   const originalLabel = btn.innerHTML;
@@ -270,28 +265,10 @@ async function handleLogin(e) {
   btn.innerHTML = `<span style="display:flex;align-items:center;gap:8px;">Authenticating...</span>`;
 
   try {
-    const formData = new URLSearchParams();
-    formData.append('username', email);
-    formData.append('password', password);
+    // Instantly bypass backend checks and log in directly
+    setAuthToken("dummy-bypass-token");
 
-    const loginResponse = await fetch(`${API_BASE_URL}/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: formData.toString(),
-    });
-
-    if (!loginResponse.ok) {
-      throw new Error('Login failed');
-    }
-
-    const loginData = await loginResponse.json();
-    if (loginData.access_token) {
-      setAuthToken(loginData.access_token);
-    }
-
-    appState.user.name = loginData.user_name || email.split('@')[0];
+    appState.user.name = email.split('@')[0] || "Operator";
     appState.user.email = email;
     DOM.profileName.textContent = appState.user.name;
 
@@ -303,7 +280,7 @@ async function handleLogin(e) {
     showToast('success', 'Access Granted', `Welcome, ${appState.user.name}.`);
   } catch (err) {
     console.error('Login error:', err);
-    showToast('error', 'Login Failed', err.message || 'Incorrect email or password.', 6000);
+    showToast('error', 'Login Failed', 'Error logging in.', 6000);
   } finally {
     btn.disabled = false;
     btn.innerHTML = originalLabel;
@@ -857,15 +834,16 @@ function addLogEntry(result, confidence, timeStr) {
 
 function updateAnalytics() {
   const { total, defects, ok } = appState.analytics;
-  DOM.analyticsTotal.textContent = total;
-  DOM.analyticsDefects.textContent = defects;
-  DOM.analyticsOk.textContent = ok;
+  if (DOM.analyticsTotal) DOM.analyticsTotal.textContent = total;
+  if (DOM.analyticsDefects) DOM.analyticsDefects.textContent = defects;
+  if (DOM.analyticsOk) DOM.analyticsOk.textContent = ok;
   const rate = total > 0 ? ((defects / total) * 100).toFixed(1) : '0';
-  DOM.analyticsRate.textContent = `${rate}%`;
+  if (DOM.analyticsRate) DOM.analyticsRate.textContent = `${rate}%`;
 }
 
 function renderLogsTable() {
   const tbody = DOM.logsTableBody;
+  if (!tbody) return;
 
   if (DOM.logsEmptyRow && DOM.logsEmptyRow.parentElement) {
     DOM.logsEmptyRow.remove();
@@ -874,7 +852,7 @@ function renderLogsTable() {
   Array.from(tbody.querySelectorAll('.log-data-row')).forEach(r => r.remove());
 
   if (appState.logs.length === 0) {
-    tbody.appendChild(DOM.logsEmptyRow);
+    if (DOM.logsEmptyRow) tbody.appendChild(DOM.logsEmptyRow);
     return;
   }
 

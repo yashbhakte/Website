@@ -12,3 +12,5 @@ psycopg2-binary
 python-jose
 passlib[bcrypt]
 pydantic
+python-dotenv
+pymongo

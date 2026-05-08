@@ -1,0 +1,77 @@
+{
+  "scans": [
+    {
+      "user_id": 0,
+      "image_path": "uploads/anonymous_20260509_011132_capture.jpg",
+      "defect_key": "stain",
+      "defect_label": "stain",
+      "confidence": 100.0,
+      "severity": "High",
+      "reason_1": "75%: Oil leakage from bearings/cams.",
+      "reason_2": "20%: Dirt or sweat from manual handling.",
+      "reason_3": "5%: Rust marks from old machine parts.",
+      "machine": "Any Machine (Spinning/Loom)",
+      "suggestion": "Clean oil seals; enforce worker hand-hygiene protocols.",
+      "status": "defect",
+      "created_at": "2026-05-08 19:41:33.028675+00:00",
+      "_id": "dfe10448-a135-4880-acef-67b6170839c2"
+    },
+    {
+      "user_id": 0,
+      "image_path": "uploads/anonymous_20260509_011144_capture.jpg",
+      "defect_key": "stain",
+      "defect_label": "stain",
+      "confidence": 100.0,
+      "severity": "High",
+      "reason_1": "75%: Oil leakage from bearings/cams.",
+      "reason_2": "20%: Dirt or sweat from manual handling.",
+      "reason_3": "5%: Rust marks from old machine parts.",
+      "machine": "Any Machine (Spinning/Loom)",
+      "suggestion": "Clean oil seals; enforce worker hand-hygiene protocols.",
+      "status": "defect",
+      "created_at": "2026-05-08 19:41:44.757632+00:00",
+      "_id": "964541ce-1ec9-4345-8785-87c024b29960"
+    },
+    {
+      "user_id": 0,
+      "image_path": "uploads/anonymous_20260509_011325_capture.jpg",
+      "defect_key": "stain",
+      "defect_label": "stain",
+      "confidence": 100.0,
+      "severity": "High",
+      "reason_1": "75%: Oil leakage from bearings/cams.",
+      "reason_2": "20%: Dirt or sweat from manual handling.",
+      "reason_3": "5%: Rust marks from old machine parts.",
+      "machine": "Any Machine (Spinning/Loom)",
+      "suggestion": "Clean oil seals; enforce worker hand-hygiene protocols.",
+      "status": "defect",
+      "created_at": "2026-05-08 19:43:26.107084+00:00",
+      "_id": "1adfb9c4-a422-4935-ae12-f667d29f4d2c"
+    },
+    {
+      "user_id": 0,
+      "image_path": "uploads/anonymous_20260509_011538_capture.jpg",
+      "defect_key": "stain",
+      "defect_label": "stain",
+      "confidence": 99.95,
+      "severity": "High",
+      "reason_1": "75%: Oil leakage from bearings/cams.",
+      "reason_2": "20%: Dirt or sweat from manual handling.",
+      "reason_3": "5%: Rust marks from old machine parts.",
+      "machine": "Any Machine (Spinning/Loom)",
+      "suggestion": "Clean oil seals; enforce worker hand-hygiene protocols.",
+      "status": "defect",
+      "created_at": "2026-05-08 19:45:38.521036+00:00",
+      "_id": "82be611e-2a40-4315-ae13-e736ad726ce8"
+    }
+  ],
+  "users": [
+    {
+      "full_name": "dsds",
+      "email": "dsds@gmail.com",
+      "hashed_password": "$pbkdf2-sha256$29000$YgxBqNV67x0D4DzHeO.dcw$Ia7/WqdZJt9AcaLg.rYIkILCf3/982/F383jz2gIDN4",
+      "created_at": "2026-05-08 19:43:17.040704+00:00",
+      "_id": "fa55163f-87c3-47ba-9dda-58690d2e68b0"
+    }
+  ]
+}
