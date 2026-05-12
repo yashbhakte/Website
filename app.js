@@ -920,11 +920,7 @@ function showResults(result, imageURL, confidence) {
 
   addLogEntry(result, confidence, timeStr);
 
-  if (result.status === 'defect') {
-    showToast('error', 'Defect Detected', `${result.label} — Confidence: ${confidence}%`, 6000);
-  } else {
-    showToast('success', 'Inspection Passed', `Fabric sample cleared. Confidence: ${confidence}%`, 5000);
-  }
+  // Removed toasts to prevent screen occlusion per request.
 }
 
 /* ═══════════════════════════════════════════════════════════════
