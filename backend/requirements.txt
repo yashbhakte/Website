@@ -1,7 +1,6 @@
 fastapi
 uvicorn
-ultralytics
-torch
+numpy
 opencv-python-headless
 pillow
 pandas
@@ -14,3 +13,5 @@ passlib[bcrypt]
 pydantic
 python-dotenv
 pymongo
+onnx
+onnxruntime

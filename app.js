@@ -63,7 +63,7 @@ const DEMO_IMAGES = [
 ];
 
 /* ── API CONFIGURATION ───────────────────────────────────────── */
-const API_BASE_URL = "https://website-nse6.onrender.com";
+const API_BASE_URL = "https://fabric-guard-backend.onrender.com";
 
 function setAuthToken(token) {
   localStorage.setItem('token', token);
@@ -262,8 +262,13 @@ function initProfileDropdownListeners() {
 async function handleLogin(e) {
   e.preventDefault();
 
-  const email = DOM.loginId.value.trim() || "operator@neuai.com";
-  const password = DOM.loginPassword.value.trim() || "password";
+  const email = DOM.loginId.value.trim();
+  const password = DOM.loginPassword.value.trim();
+
+  if (!email || !password) {
+    showToast('error', 'Missing Details', 'Please enter email and password.');
+    return;
+  }
 
   const btn = DOM.loginForm.querySelector('button[type="submit"]');
   const originalLabel = btn.innerHTML;
@@ -271,10 +276,28 @@ async function handleLogin(e) {
   btn.innerHTML = `<span style="display:flex;align-items:center;gap:8px;">Authenticating...</span>`;
 
   try {
-    // Instantly bypass backend checks and log in directly
-    setAuthToken("dummy-bypass-token");
+    const formData = new URLSearchParams();
+    formData.append('username', email);
+    formData.append('password', password);
 
-    appState.user.name = email.split('@')[0] || "Operator";
+    const loginResponse = await fetch(`${API_BASE_URL}/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: formData.toString(),
+    });
+
+    if (!loginResponse.ok) {
+      throw new Error('Login failed');
+    }
+
+    const loginData = await loginResponse.json();
+    if (loginData.access_token) {
+      setAuthToken(loginData.access_token);
+    }
+
+    appState.user.name = loginData.user_name || email.split('@')[0];
     appState.user.email = email;
     DOM.profileName.textContent = appState.user.name;
 
@@ -286,7 +309,7 @@ async function handleLogin(e) {
     showToast('success', 'Access Granted', `Welcome, ${appState.user.name}.`);
   } catch (err) {
     console.error('Login error:', err);
-    showToast('error', 'Login Failed', 'Error logging in.', 6000);
+    showToast('error', 'Login Failed', err.message || 'Incorrect email or password.', 6000);
   } finally {
     btn.disabled = false;
     btn.innerHTML = originalLabel;
@@ -722,7 +745,15 @@ async function processBatch(files) {
     console.error('Batch processing error:', err);
     DOM.processingOverlay.classList.add('hidden');
     appState.isProcessing = false;
-    showToast('error', 'Batch Scan Failed', err.message || 'Could not connect to backend server.', 8000);
+    
+    let errorMessage = 'Could not connect to backend server.';
+    if (err.message.includes('NetworkError') || err.message.includes('CORS')) {
+      errorMessage = 'Server connection failed. Waiting for server to wake up...';
+    } else if (err.message.includes('502')) {
+      errorMessage = 'Server is starting up. Please try again in 30 seconds.';
+    }
+    
+    showToast('error', 'Batch Scan Failed', errorMessage, 8000);
   }
 }
 
@@ -834,6 +865,15 @@ async function processImage(imageDataURL, source) {
       err.message || 'Could not connect to the backend server.',
       8000
     );
+
+    // Enhanced error logging for CORS issues
+    if (err.message.includes('CORS') || err.message.includes('NetworkError')) {
+      console.error('CORS or Network Error Details:', {
+        message: err.message,
+        stack: err.stack,
+        backend_url: API_BASE_URL
+      });
+    }
   }
 }
 
@@ -1170,6 +1210,35 @@ function initDemoButton() {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   15. KEEP-ALIVE ENDPOINT (Render Free Tier Prevention)
+   ═══════════════════════════════════════════════════════════════ */
+/**
+ * Send periodic pings to backend to prevent Render free tier from spinning down
+ * Render spins down after 15 minutes of inactivity. This keeps it warm.
+ */
+function initKeepAlive() {
+  const ping = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/ping`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (response.ok) {
+        console.log('Keep-alive ping sent successfully');
+      }
+    } catch (error) {
+      console.log('Keep-alive ping failed (non-critical):', error.message);
+    }
+  };
+
+  // Initial ping
+  ping();
+
+  // Ping every 10 minutes (600000 ms) to keep server warm
+  setInterval(ping, 10 * 60 * 1000);
+}
+
+/* ═══════════════════════════════════════════════════════════════
    16. SERVICE WORKER REGISTRATION
    ═══════════════════════════════════════════════════════════════ */
 if ('serviceWorker' in navigator) {
@@ -1194,6 +1263,7 @@ function init() {
   initBatchNavigation();
   initLogsListeners();
   initDemoButton();
+  initKeepAlive(); // Start keep-alive pings to prevent server cold-start
 
   // Load demo data
   loadDemoLogs();

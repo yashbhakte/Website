@@ -4,7 +4,8 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 # pyrefly: ignore [missing-import]
 from fastapi.staticfiles import StaticFiles
 import uvicorn
-from ultralytics import YOLO
+import onnxruntime as ort
+import numpy as np
 import pandas as pd
 import io
 from PIL import Image
@@ -33,7 +34,8 @@ app = FastAPI()
 # Enable CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # or your frontend URL
+    allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -51,12 +53,18 @@ import os
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-MODEL_PATH = os.path.join(BASE_DIR,"model","best.pt")
+MODEL_PATH = os.path.join(BASE_DIR,"model","best.onnx")
 EXCEL_PATH = os.path.join(BASE_DIR,"data","Fabric Defect Reason,Machine,Suggestion Dataset.xlsx")
 
 # Global variables
 model = None
 mapping_data = {}
+
+CLASS_LABELS = {
+    0: 'Broken stitch', 1: 'Needle mark', 2: 'Pinched fabric', 
+    3: 'Vertical', 4: 'defect free', 5: 'hole', 
+    6: 'horizontal', 7: 'lines', 8: 'stain'
+}
 
 # Pydantic Models for API
 class UserSignup(BaseModel):
@@ -134,7 +142,7 @@ def load_resources():
     print(f"Loading model from {MODEL_PATH}...")
     if os.path.exists(MODEL_PATH):
         try:
-            model = YOLO(MODEL_PATH)
+            model = ort.InferenceSession(MODEL_PATH, providers=['CPUExecutionProvider'])
             print("Model loaded successfully")
         except Exception as e:
             print(f"Error loading model: {e}")
@@ -193,6 +201,12 @@ async def root():
         "status": "online",
         "model_loaded": model is not None or os.path.exists(MODEL_PATH)
     }
+
+
+@app.get("/ping")
+async def ping():
+    """Lightweight keep-alive endpoint to prevent Render free tier from spinning down"""
+    return {"status": "pong", "timestamp": datetime.datetime.now().isoformat()}
 
 
 # --- Auth Endpoints ---
@@ -255,7 +269,7 @@ async def predict(
         print("Loading model on first prediction...")
         if os.path.exists(MODEL_PATH):
             try:
-                model = YOLO(MODEL_PATH)
+                model = ort.InferenceSession(MODEL_PATH, providers=['CPUExecutionProvider'])
                 print("Model loaded successfully")
             except Exception as e:
                 print(f"Error loading model: {e}")
@@ -310,17 +324,40 @@ async def predict(
             with open(file_path, "wb") as f:
                 f.write(contents)
         
-        # Resize image to save memory on Render's free tier (512MB limit)
-        image.thumbnail((416, 416))
         
-        # Run inference
-        results = model.predict(image, verbose=False)
+        # --- PREPARE IMAGE FOR ONNX ---
+        # Resize to model's expected size (224x224)
+        input_size = (224, 224)
+        img_resized = image.resize(input_size)
         
-        # Get top prediction
-        probs = results[0].probs
-        top1_idx = int(probs.top1)
-        top1_conf = float(probs.top1conf)
-        predicted_class_raw = results[0].names[top1_idx]
+        # Convert to numpy array & normalize to range 0-1
+        img_arr = np.array(img_resized).astype(np.float32) / 255.0
+        
+        # Transpose from (Height, Width, Channel) to (Channel, Height, Width)
+        # and add explicit Batch Dimension (1, 3, 224, 224)
+        img_input = np.transpose(img_arr, (2, 0, 1))[np.newaxis, :]
+        
+        # --- RUN INFERENCE ---
+        # Get model input layer name automatically
+        input_name = model.get_inputs()[0].name
+        
+        # Execute model session
+        ort_outs = model.run(None, {input_name: img_input})
+        
+        # --- POST-PROCESS OUTPUTS ---
+        # Extraction of scores for the first (and only) batch result
+        logits = ort_outs[0][0]
+        
+        # Safe Softmax implementation to ensure reliable confidence distribution
+        exp_logits = np.exp(logits - np.max(logits))
+        probabilities = exp_logits / exp_logits.sum()
+        
+        # Get index of highest probability
+        top1_idx = int(np.argmax(probabilities))
+        top1_conf = float(probabilities[top1_idx])
+        
+        # Fetch friendly display name from hardcoded labels map
+        predicted_class_raw = CLASS_LABELS.get(top1_idx, "Unknown")
         
         # Normalize for mapping
         defect_key = normalize_defect_name(predicted_class_raw)
