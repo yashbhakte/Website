@@ -661,24 +661,11 @@ async function processBatch(files) {
       const file = files[i];
       modelNameEl.textContent = `Processing Sample ${i + 1} of ${files.length}...`;
 
-      const fileDataURL = await new Promise((resolve, reject) => {
-        const r = new FileReader();
-        r.onload = (ev) => resolve(ev.target.result);
-        r.onerror = (err) => reject(err);
-        r.readAsDataURL(file);
-      });
-
-      let blob;
-      if (fileDataURL.startsWith('data:')) {
-        blob = dataURLtoBlob(fileDataURL);
-      } else {
-        const response = await fetch(fileDataURL);
-        blob = await response.blob();
-      }
+      const isVideo = file.type.startsWith('video/');
+      const localPreviewURL = isVideo ? null : URL.createObjectURL(file);
 
       const formData = new FormData();
-      const fileExt = blob.type.startsWith('video/') ? 'video.mp4' : 'capture.jpg';
-      formData.append('file', blob, fileExt);
+      formData.append('file', file, isVideo ? 'upload.mp4' : 'upload.jpg');
 
       const token = getAuthToken();
       const headers = {};
@@ -718,7 +705,7 @@ async function processBatch(files) {
 
       appState.batchResults.push({
         result: result,
-        imageURL: fileDataURL.startsWith('data:video') ? apiResult.image_url : fileDataURL,
+        imageURL: isVideo ? apiResult.image_url : localPreviewURL,
         confidence: apiResult.confidence
       });
     }
