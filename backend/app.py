@@ -6,8 +6,8 @@ from fastapi.staticfiles import StaticFiles
 import uvicorn
 import onnxruntime as ort
 import numpy as np
-import pandas as pd
 import io
+import gc
 from PIL import Image
 import os
 import json
@@ -55,6 +55,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 MODEL_PATH = os.path.join(BASE_DIR,"model","best.onnx")
 EXCEL_PATH = os.path.join(BASE_DIR,"data","Fabric Defect Reason,Machine,Suggestion Dataset.xlsx")
+MAPPING_JSON_PATH = os.path.join(BASE_DIR,"data","mapping.json")
 
 # Global variables
 model = None
@@ -142,7 +143,13 @@ def load_resources():
     print(f"Loading model from {MODEL_PATH}...")
     if os.path.exists(MODEL_PATH):
         try:
-            model = ort.InferenceSession(MODEL_PATH, providers=['CPUExecutionProvider'])
+            # Limit threads to prevent memory spikes and CPU contention crashes on Render
+            opts = ort.SessionOptions()
+            opts.intra_op_num_threads = 1
+            opts.inter_op_num_threads = 1
+            opts.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+            
+            model = ort.InferenceSession(MODEL_PATH, sess_options=opts, providers=['CPUExecutionProvider'])
             print("Model loaded successfully")
         except Exception as e:
             print(f"Error loading model: {e}")
@@ -150,8 +157,21 @@ def load_resources():
     else:
         print(f"Model not found at {MODEL_PATH}")
     
+    # Try loading mapping from lightweight JSON
+    if os.path.exists(MAPPING_JSON_PATH):
+        try:
+            with open(MAPPING_JSON_PATH, "r", encoding="utf-8") as f:
+                mapping_data = json.load(f)
+            print("Mapping loaded successfully from JSON (low memory).")
+            return
+        except Exception as e:
+            print(f"Error loading mapping JSON: {e}")
+
+    # Fallback to Excel only if JSON fails or is missing
     if os.path.exists(EXCEL_PATH):
         try:
+            print("Falling back to loading Excel mapping (Higher memory usage)...")
+            import pandas as pd
             df = pd.read_excel(EXCEL_PATH)
             for _, row in df.iterrows():
                 defect_name = normalize_defect_name(row['Defect Category'])
@@ -162,7 +182,9 @@ def load_resources():
                     "suggestion": str(row.get('Suggestion to reduce future defect', 'N/A')),
                     "machine": str(row.get('Machine Responsible', 'N/A'))
                 }
-            print("Mapping loaded successfully.")
+            print("Mapping loaded successfully from Excel.")
+            del pd, df
+            gc.collect()
         except Exception as e:
             print(f"Error loading Excel: {e}")
 
@@ -175,10 +197,24 @@ async def startup_event():
     except Exception as e:
         print(f"Error initializing database: {e}")
     
-    # Load Excel mapping only (lightweight)
+    # Load mapping
     global mapping_data
+    
+    # Try loading mapping from lightweight JSON
+    if os.path.exists(MAPPING_JSON_PATH):
+        try:
+            with open(MAPPING_JSON_PATH, "r", encoding="utf-8") as f:
+                mapping_data = json.load(f)
+            print("Mapping loaded successfully from JSON.")
+            return
+        except Exception as e:
+            print(f"Error loading mapping JSON: {e}")
+            
+    # Fallback to Excel only if JSON is missing
     if os.path.exists(EXCEL_PATH):
         try:
+            print("Falling back to loading Excel mapping (Higher memory usage)...")
+            import pandas as pd
             df = pd.read_excel(EXCEL_PATH)
             for _, row in df.iterrows():
                 defect_name = normalize_defect_name(row['Defect Category'])
@@ -189,7 +225,9 @@ async def startup_event():
                     "suggestion": str(row.get('Suggestion to reduce future defect', 'N/A')),
                     "machine": str(row.get('Machine Responsible', 'N/A'))
                 }
-            print("Mapping loaded successfully.")
+            print("Mapping loaded successfully from Excel.")
+            del pd, df
+            gc.collect()
         except Exception as e:
             print(f"Error loading Excel: {e}")
     
@@ -269,8 +307,14 @@ async def predict(
         print("Loading model on first prediction...")
         if os.path.exists(MODEL_PATH):
             try:
-                model = ort.InferenceSession(MODEL_PATH, providers=['CPUExecutionProvider'])
-                print("Model loaded successfully")
+                # Limit threads to prevent memory spikes and CPU contention crashes on Render
+                opts = ort.SessionOptions()
+                opts.intra_op_num_threads = 1
+                opts.inter_op_num_threads = 1
+                opts.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+                
+                model = ort.InferenceSession(MODEL_PATH, sess_options=opts, providers=['CPUExecutionProvider'])
+                print("Model loaded successfully with optimized session options")
             except Exception as e:
                 print(f"Error loading model: {e}")
                 raise HTTPException(status_code=503, detail=f"Model loading failed: {str(e)}")
@@ -337,6 +381,10 @@ async def predict(
         # and add explicit Batch Dimension (1, 3, 224, 224)
         img_input = np.transpose(img_arr, (2, 0, 1))[np.newaxis, :]
         
+        # Collect garbage to free up raw image bytes and prevent OOM crash before inference
+        del contents, image, img_resized, img_arr
+        gc.collect()
+        
         # --- RUN INFERENCE ---
         # Get model input layer name automatically
         input_name = model.get_inputs()[0].name
@@ -347,6 +395,10 @@ async def predict(
         # --- POST-PROCESS OUTPUTS ---
         # Extraction of scores for the first (and only) batch result
         logits = ort_outs[0][0]
+        
+        # Explicitly clean inference variables
+        del img_input, ort_outs
+        gc.collect()
         
         # Safe Softmax implementation to ensure reliable confidence distribution
         exp_logits = np.exp(logits - np.max(logits))
