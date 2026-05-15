@@ -20,6 +20,7 @@ import shutil
 
 # Local imports
 from database import init_db, get_db
+from cloudflare_service import upload_to_r2
 
 # Security Constants
 SECRET_KEY = "neuai-secret-key-for-fabricguard" # In production, use env variable
@@ -61,11 +62,13 @@ import os
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 MODEL_PATH = os.path.join(BASE_DIR,"model","best.onnx")
+FABRIC_MODEL_PATH = os.path.join(BASE_DIR,"model","fabric_nonfabric_classifier.onnx")
 EXCEL_PATH = os.path.join(BASE_DIR,"data","Fabric Defect Reason,Machine,Suggestion Dataset.xlsx")
 MAPPING_JSON_PATH = os.path.join(BASE_DIR,"data","mapping.json")
 
 # Global variables
 model = None
+fabric_model = None
 mapping_data = {}
 
 CLASS_LABELS = {
@@ -304,7 +307,7 @@ async def predict(
     file: UploadFile = File(...), 
     db = Depends(get_db)
 ):
-    global model
+    global model, fabric_model
     
     # Lazy load model on first prediction
     if model is None:
@@ -324,6 +327,24 @@ async def predict(
                 raise HTTPException(status_code=503, detail=f"Model loading failed: {str(e)}")
         else:
             raise HTTPException(status_code=503, detail="Model file not found")
+
+    # Lazy load fabric classifier model
+    if fabric_model is None:
+        print("Loading fabric classifier model on first prediction...")
+        if os.path.exists(FABRIC_MODEL_PATH):
+            try:
+                opts = ort.SessionOptions()
+                opts.intra_op_num_threads = 1
+                opts.inter_op_num_threads = 1
+                opts.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+                
+                fabric_model = ort.InferenceSession(FABRIC_MODEL_PATH, sess_options=opts, providers=['CPUExecutionProvider'])
+                print("Fabric classifier model loaded successfully with optimized session options")
+            except Exception as e:
+                print(f"Error loading fabric classifier model: {e}")
+                # We don't crash if the optional model fails to load
+        else:
+            print(f"Fabric classifier model not found at {FABRIC_MODEL_PATH}")
     
     try:
         import cv2
@@ -372,6 +393,42 @@ async def predict(
             with open(file_path, "wb") as f:
                 f.write(contents)
         
+        
+        # --- RUN FABRIC / NON-FABRIC CLASSIFICATION ---
+        if fabric_model is not None:
+            try:
+                # Fabric model expects 160x160 and range 0-1
+                fabric_img_resized = image.resize((160, 160))
+                fabric_img_arr = np.array(fabric_img_resized).astype(np.float32) / 255.0
+                # MobileNetV2 expects Channels-Last: (1, 160, 160, 3)
+                fabric_img_input = np.expand_dims(fabric_img_arr, axis=0)
+                
+                fabric_input_name = fabric_model.get_inputs()[0].name
+                fabric_ort_outs = fabric_model.run(None, {fabric_input_name: fabric_img_input})
+                
+                fabric_probs = fabric_ort_outs[0][0]
+                class_idx = int(np.argmax(fabric_probs))
+                
+                print(f"Fabric vs Non-Fabric inference: probabilities={fabric_probs}, selected={class_idx}")
+                
+                # class_idx == 0 is non-fabric, 1 is fabric
+                if class_idx == 0:
+                    print("Classification: NON-FABRIC IMAGE DETECTED. Blocking prediction.")
+                    return {
+                        "status": "non_fabric",
+                        "defect_key": "non-fabric",
+                        "defect_label": "Non-Fabric",
+                        "confidence": round(float(np.max(fabric_probs)) * 100, 2),
+                        "severity": "N/A",
+                        "reason_1": "Image doesn't contain fabric",
+                        "reason_2": "N/A",
+                        "reason_3": "N/A",
+                        "machine": "N/A",
+                        "suggestion": "Please upload a valid fabric sample to inspect.",
+                        "image_url": f"{str(request.base_url).rstrip('/')}/uploads/{filename}"
+                    }
+            except Exception as e:
+                print(f"Fabric classification run failed: {e}")
         
         # --- PREPARE IMAGE FOR ONNX ---
         # Resize to model's expected size (224x224)
@@ -430,10 +487,18 @@ async def predict(
         status_val = "ok" if defect_key == "defect free" else "defect"
         severity = "None" if status_val == "ok" else "High"
         
+        # --- CLOUDFLARE CLOUD STORAGE ---
+        # Upload the validated fabric sample to Cloudflare R2 and get a persistent URL
+        cf_url = upload_to_r2(file_path, filename)
+        
+        # Final paths to save (prefer cloud URL, fallback to local if CF not configured)
+        db_image_path = cf_url if cf_url else f"uploads/{filename}"
+        api_image_url = cf_url if cf_url else f"{str(request.base_url).rstrip('/')}/uploads/{filename}"
+
         # Save to database
         db.scans.insert_one({
             "user_id": 0,
-            "image_path": f"uploads/{filename}",
+            "image_path": db_image_path,
             "defect_key": defect_key,
             "defect_label": predicted_class_raw,
             "confidence": round(top1_conf * 100, 2),
@@ -458,7 +523,7 @@ async def predict(
             "reason_3": info.get("reason_3"),
             "machine": info.get("machine"),
             "suggestion": info.get("suggestion"),
-            "image_url": f"{str(request.base_url).rstrip('/')}/uploads/{filename}"
+            "image_url": api_image_url
         }
         
     except Exception as e:

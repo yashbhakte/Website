@@ -13,3 +13,4 @@ python-dotenv
 pymongo
 onnx
 onnxruntime
+boto3

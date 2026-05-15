@@ -63,7 +63,9 @@ const DEMO_IMAGES = [
 ];
 
 /* ── API CONFIGURATION ───────────────────────────────────────── */
-const API_BASE_URL = "https://fabric-guard-backend.onrender.com";
+const API_BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:')
+  ? "http://127.0.0.1:8000"
+  : "https://website-boqz.onrender.com";
 
 function setAuthToken(token) {
   localStorage.setItem('token', token);
@@ -295,7 +297,7 @@ async function handleLogin(e) {
         });
 
         if (loginResponse.ok) break;
-        
+
         if (loginResponse.status === 502 || loginResponse.status === 503) {
           lastError = `Server error: ${loginResponse.status}`;
           if (retryCount === 0) {
@@ -338,13 +340,13 @@ async function handleLogin(e) {
   } catch (err) {
     console.error('Login error:', err);
     let errorMessage = err.message || 'Incorrect email or password.';
-    
+
     if (err.message && (err.message.includes('502') || err.message.includes('503'))) {
       errorMessage = '⏳ Server is starting up. Please wait 30-60 seconds and try again.';
     } else if (err.name === 'AbortError') {
       errorMessage = 'Request timeout. Please check your internet and try again.';
     }
-    
+
     showToast('error', 'Login Failed', errorMessage, 8000);
   } finally {
     btn.disabled = false;
@@ -605,7 +607,7 @@ function initCameraListeners() {
     DOM.fileInput.addEventListener('change', (e) => {
       const files = Array.from(e.target.files || []).slice(0, 10);
       if (files.length === 0) return;
-      
+
       for (const file of files) {
         if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
           showToast('error', 'Invalid File', 'Please select valid image or video files.');
@@ -616,7 +618,7 @@ function initCameraListeners() {
           return;
         }
       }
-      
+
       processBatch(files);
       e.target.value = '';
     });
@@ -679,6 +681,8 @@ function buildDemoResult() {
   };
 }
 
+
+
 async function processBatch(files) {
   if (appState.isProcessing) return;
   appState.isProcessing = true;
@@ -722,13 +726,13 @@ async function processBatch(files) {
           });
 
           if (response.ok) break; // Success, exit retry loop
-          
+
           if (response.status === 502 || response.status === 503) {
             lastError = `Server error: ${response.status}`;
             if (retryCount < 2) {
               // Wait before retrying (exponential backoff)
               const waitTime = (retryCount + 1) * 5000;
-              modelNameEl.textContent = `Retrying Sample ${i + 1}... (waiting ${waitTime/1000}s)`;
+              modelNameEl.textContent = `Retrying Sample ${i + 1}... (waiting ${waitTime / 1000}s)`;
               await new Promise(resolve => setTimeout(resolve, waitTime));
             }
           } else {
@@ -738,7 +742,7 @@ async function processBatch(files) {
           lastError = err;
           if (retryCount < 2 && (err.name === 'AbortError' || err.message.includes('502') || err.message.includes('503'))) {
             const waitTime = (retryCount + 1) * 5000;
-            modelNameEl.textContent = `Retrying Sample ${i + 1}... (waiting ${waitTime/1000}s)`;
+            modelNameEl.textContent = `Retrying Sample ${i + 1}... (waiting ${waitTime / 1000}s)`;
             await new Promise(resolve => setTimeout(resolve, waitTime));
           } else {
             throw err;
@@ -751,6 +755,12 @@ async function processBatch(files) {
       }
 
       const apiResult = await response.json();
+
+      if (apiResult.status === 'non_fabric') {
+        showToast('error', 'Invalid Image Sample', `File ${i + 1} was rejected: Please upload a valid image of fabric.`, 7000);
+        continue; // Skip this item in the batch
+      }
+
       const uiConfig = DEFECT_DATABASE[apiResult.defect_key] || DEFECT_DATABASE['hole'];
 
       const result = {
@@ -793,16 +803,20 @@ async function processBatch(files) {
       }
 
       showResults(first.result, first.imageURL, first.result.confidence);
+    } else {
+      // If all samples in batch were rejected
+      DOM.imagePreview.src = '';
+      DOM.imagePreview.classList.add('hidden');
+      DOM.cameraIdle.classList.remove('hidden');
     }
-
   } catch (err) {
     console.error('Batch processing error:', err);
     DOM.processingOverlay.classList.add('hidden');
     appState.isProcessing = false;
-    
+
     let errorMessage = 'Could not connect to backend server.';
     let duration = 8000;
-    
+
     if (err.message.includes('502') || err.message.includes('503')) {
       errorMessage = '⏳ Server is waking up (free tier cold start). Please try again in 60 seconds. It may take 30-90 seconds to start.';
       duration = 12000;
@@ -813,7 +827,7 @@ async function processBatch(files) {
       errorMessage = 'Server connection failed. Check your internet and try again. If problem persists, the server may be starting up.';
       duration = 10000;
     }
-    
+
     showToast('error', 'Batch Scan Failed', errorMessage, duration);
   }
 }
@@ -882,6 +896,14 @@ async function processImage(imageDataURL, source) {
     DOM.processingOverlay.classList.add('hidden');
     appState.isProcessing = false;
 
+    if (apiResult.status === 'non_fabric') {
+      showToast('error', 'Invalid Image Sample', 'The uploaded image is not recognized as fabric. Please upload a valid fabric image.', 7500);
+      DOM.imagePreview.src = '';
+      DOM.imagePreview.classList.add('hidden');
+      DOM.cameraIdle.classList.remove('hidden');
+      return;
+    }
+
     const uiConfig = DEFECT_DATABASE[apiResult.defect_key] || DEFECT_DATABASE['hole'];
 
     const result = {
@@ -922,7 +944,7 @@ async function processImage(imageDataURL, source) {
 
     let errorMessage = err.message || 'Could not connect to the backend server.';
     let duration = 8000;
-    
+
     // Handle 502 cold start errors
     if (err.message.includes('502')) {
       errorMessage = '⏳ Server is waking up (free tier cold start). Please try again in 30-60 seconds.';
