@@ -31,14 +31,21 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 app = FastAPI()
 
-# Enable CORS
+# Enable CORS - Must be first middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    max_age=3600,
 )
+
+# Explicit OPTIONS handler for preflight requests
+@app.options("/{full_path:path}")
+async def preflight_handler(full_path: str):
+    """Handle CORS preflight requests"""
+    return {"status": "ok"}
 
 # Uploads directory
 UPLOADS_DIR = os.path.join(os.path.dirname(__file__), "uploads")
@@ -241,10 +248,7 @@ async def root():
     }
 
 
-@app.get("/ping")
-async def ping():
-    """Lightweight keep-alive endpoint to prevent Render free tier from spinning down"""
-    return {"status": "pong", "timestamp": datetime.datetime.now().isoformat()}
+
 
 
 # --- Auth Endpoints ---
@@ -490,6 +494,14 @@ async def get_analytics(
         "ok": ok,
         "rate": f"{rate}%"
     }
+
+@app.get("/ping")
+async def ping():
+    """
+    Health check endpoint for Render free tier keep-alive.
+    Prevents server from spinning down after 15 minutes of inactivity.
+    """
+    return {"status": "ok", "message": "Server is running", "timestamp": datetime.datetime.now().isoformat()}
 
 if __name__ == "__main__":
     import os

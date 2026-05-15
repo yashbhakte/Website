@@ -280,16 +280,44 @@ async function handleLogin(e) {
     formData.append('username', email);
     formData.append('password', password);
 
-    const loginResponse = await fetch(`${API_BASE_URL}/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: formData.toString(),
-    });
+    // Retry logic for server cold-start issues
+    let loginResponse;
+    let lastError;
+    for (let retryCount = 0; retryCount < 2; retryCount++) {
+      try {
+        loginResponse = await fetch(`${API_BASE_URL}/login`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: formData.toString(),
+          signal: AbortSignal.timeout(30000)
+        });
+
+        if (loginResponse.ok) break;
+        
+        if (loginResponse.status === 502 || loginResponse.status === 503) {
+          lastError = `Server error: ${loginResponse.status}`;
+          if (retryCount === 0) {
+            btn.innerHTML = `<span style="display:flex;align-items:center;gap:8px;">⏳ Server starting up, retrying...</span>`;
+            await new Promise(resolve => setTimeout(resolve, 3000));
+          }
+        } else {
+          throw new Error('Login failed');
+        }
+      } catch (err) {
+        lastError = err;
+        if (retryCount === 0 && (err.name === 'AbortError' || err.message.includes('502') || err.message.includes('503'))) {
+          btn.innerHTML = `<span style="display:flex;align-items:center;gap:8px;">⏳ Server starting up, retrying...</span>`;
+          await new Promise(resolve => setTimeout(resolve, 3000));
+        } else {
+          throw err;
+        }
+      }
+    }
 
     if (!loginResponse.ok) {
-      throw new Error('Login failed');
+      throw new Error('Login failed: ' + (lastError || 'Unknown error'));
     }
 
     const loginData = await loginResponse.json();
@@ -309,7 +337,15 @@ async function handleLogin(e) {
     showToast('success', 'Access Granted', `Welcome, ${appState.user.name}.`);
   } catch (err) {
     console.error('Login error:', err);
-    showToast('error', 'Login Failed', err.message || 'Incorrect email or password.', 6000);
+    let errorMessage = err.message || 'Incorrect email or password.';
+    
+    if (err.message && (err.message.includes('502') || err.message.includes('503'))) {
+      errorMessage = '⏳ Server is starting up. Please wait 30-60 seconds and try again.';
+    } else if (err.name === 'AbortError') {
+      errorMessage = 'Request timeout. Please check your internet and try again.';
+    }
+    
+    showToast('error', 'Login Failed', errorMessage, 8000);
   } finally {
     btn.disabled = false;
     btn.innerHTML = originalLabel;
@@ -673,14 +709,45 @@ async function processBatch(files) {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const response = await fetch(`${API_BASE_URL}/predict`, {
-        method: 'POST',
-        headers: headers,
-        body: formData
-      });
+      // Retry logic for 502/503 errors (server cold-start)
+      let response;
+      let lastError;
+      for (let retryCount = 0; retryCount < 3; retryCount++) {
+        try {
+          response = await fetch(`${API_BASE_URL}/predict`, {
+            method: 'POST',
+            headers: headers,
+            body: formData,
+            signal: AbortSignal.timeout(60000) // 60 second timeout
+          });
+
+          if (response.ok) break; // Success, exit retry loop
+          
+          if (response.status === 502 || response.status === 503) {
+            lastError = `Server error: ${response.status}`;
+            if (retryCount < 2) {
+              // Wait before retrying (exponential backoff)
+              const waitTime = (retryCount + 1) * 5000;
+              modelNameEl.textContent = `Retrying Sample ${i + 1}... (waiting ${waitTime/1000}s)`;
+              await new Promise(resolve => setTimeout(resolve, waitTime));
+            }
+          } else {
+            throw new Error(`Failed on sample ${i + 1}: ${response.status}`);
+          }
+        } catch (err) {
+          lastError = err;
+          if (retryCount < 2 && (err.name === 'AbortError' || err.message.includes('502') || err.message.includes('503'))) {
+            const waitTime = (retryCount + 1) * 5000;
+            modelNameEl.textContent = `Retrying Sample ${i + 1}... (waiting ${waitTime/1000}s)`;
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+          } else {
+            throw err;
+          }
+        }
+      }
 
       if (!response.ok) {
-        throw new Error(`Failed on sample ${i + 1}: ${response.status}`);
+        throw new Error(`Failed on sample ${i + 1}: ${response.status} - ${lastError}`);
       }
 
       const apiResult = await response.json();
@@ -734,13 +801,20 @@ async function processBatch(files) {
     appState.isProcessing = false;
     
     let errorMessage = 'Could not connect to backend server.';
-    if (err.message.includes('NetworkError') || err.message.includes('CORS')) {
-      errorMessage = 'Server connection failed. Waiting for server to wake up...';
-    } else if (err.message.includes('502')) {
-      errorMessage = 'Server is starting up. Please try again in 30 seconds.';
+    let duration = 8000;
+    
+    if (err.message.includes('502') || err.message.includes('503')) {
+      errorMessage = '⏳ Server is waking up (free tier cold start). Please try again in 60 seconds. It may take 30-90 seconds to start.';
+      duration = 12000;
+    } else if (err.name === 'AbortError') {
+      errorMessage = 'Request timeout. Server took too long to respond. Please check your internet connection or try again later.';
+      duration = 10000;
+    } else if (err.message.includes('NetworkError') || err.message.includes('CORS') || err.message.includes('Failed on sample')) {
+      errorMessage = 'Server connection failed. Check your internet and try again. If problem persists, the server may be starting up.';
+      duration = 10000;
     }
     
-    showToast('error', 'Batch Scan Failed', errorMessage, 8000);
+    showToast('error', 'Batch Scan Failed', errorMessage, duration);
   }
 }
 
@@ -846,12 +920,19 @@ async function processImage(imageDataURL, source) {
       return;
     }
 
-    showToast(
-      'error',
-      'Prediction Failed',
-      err.message || 'Could not connect to the backend server.',
-      8000
-    );
+    let errorMessage = err.message || 'Could not connect to the backend server.';
+    let duration = 8000;
+    
+    // Handle 502 cold start errors
+    if (err.message.includes('502')) {
+      errorMessage = '⏳ Server is waking up (free tier cold start). Please try again in 30-60 seconds.';
+      duration = 10000;
+    } else if (err.message.includes('CORS') || err.message.includes('NetworkError')) {
+      errorMessage = 'Server connection failed. Check your internet and try again. If the problem persists, the server may be starting up.';
+      duration = 10000;
+    }
+
+    showToast('error', 'Prediction Failed', errorMessage, duration);
 
     // Enhanced error logging for CORS issues
     if (err.message.includes('CORS') || err.message.includes('NetworkError')) {
