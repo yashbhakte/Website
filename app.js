@@ -193,6 +193,10 @@ const DOM = {
   erpCancel: $('erp-cancel'),
   erpSubmit: $('erp-submit'),
   erpNotes: $('erp-notes'),
+
+  invalidModal: $('invalid-sample-modal'),
+  invalidModalClose: $('invalid-modal-close'),
+  invalidModalOk: $('invalid-modal-ok'),
 };
 
 /* ═══════════════════════════════════════════════════════════════
@@ -757,7 +761,7 @@ async function processBatch(files) {
       const apiResult = await response.json();
 
       if (apiResult.status === 'non_fabric') {
-        showToast('error', 'Invalid Image Sample', `File ${i + 1} was rejected: Please upload a valid image of fabric.`, 7000);
+        showInvalidSampleModal();
         continue; // Skip this item in the batch
       }
 
@@ -897,7 +901,7 @@ async function processImage(imageDataURL, source) {
     appState.isProcessing = false;
 
     if (apiResult.status === 'non_fabric') {
-      showToast('error', 'Invalid Image Sample', 'The uploaded image is not recognized as fabric. Please upload a valid fabric image.', 7500);
+      showInvalidSampleModal();
       DOM.imagePreview.src = '';
       DOM.imagePreview.classList.add('hidden');
       DOM.cameraIdle.classList.remove('hidden');
@@ -1336,6 +1340,35 @@ if ('serviceWorker' in navigator) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   17. INVALID SAMPLE WARNING MODAL
+   ═══════════════════════════════════════════════════════════════ */
+function showInvalidSampleModal() {
+  if (DOM.invalidModal) {
+    DOM.invalidModal.classList.remove('hidden');
+  }
+}
+
+function closeInvalidSampleModal() {
+  if (DOM.invalidModal) {
+    DOM.invalidModal.classList.add('hidden');
+  }
+}
+
+function initInvalidSampleModal() {
+  if (DOM.invalidModalClose) {
+    DOM.invalidModalClose.addEventListener('click', closeInvalidSampleModal);
+  }
+  if (DOM.invalidModalOk) {
+    DOM.invalidModalOk.addEventListener('click', closeInvalidSampleModal);
+  }
+  if (DOM.invalidModal) {
+    DOM.invalidModal.addEventListener('click', (e) => {
+      if (e.target === DOM.invalidModal) closeInvalidSampleModal();
+    });
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
    INIT
    ═══════════════════════════════════════════════════════════════ */
 function init() {
@@ -1349,6 +1382,7 @@ function init() {
   initBatchNavigation();
   initLogsListeners();
   initDemoButton();
+  initInvalidSampleModal();
   initKeepAlive(); // Start keep-alive pings to prevent server cold-start
 
   // Load demo data

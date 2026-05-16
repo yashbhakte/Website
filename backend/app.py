@@ -275,17 +275,13 @@ async def signup(user: UserSignup, db = Depends(get_db)):
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), db = Depends(get_db)):
     user = db.users.find_one({"email": form_data.username})
     
-    # Auto-create user if they don't exist to allow any email to login
-    if not user:
-        user = {
-            "full_name": form_data.username.split('@')[0],
-            "email": form_data.username,
-            "hashed_password": get_password_hash("dummy_password"),
-            "created_at": datetime.datetime.now(datetime.timezone.utc)
-        }
-        db.users.insert_one(user)
-    
-    # Bypass password verification to allow any password
+    # Verify user exists and password is correct
+    if not user or not verify_password(form_data.password, user["hashed_password"]):
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     
     # Generate token
     access_token = create_access_token(data={"sub": user["email"]})
@@ -305,7 +301,8 @@ async def read_users_me(current_user = Depends(get_current_user)):
 async def predict(
     request: Request,
     file: UploadFile = File(...), 
-    db = Depends(get_db)
+    db = Depends(get_db),
+    current_user = Depends(get_current_user)
 ):
     global model, fabric_model
     
@@ -497,17 +494,9 @@ async def predict(
 
         # Save to database
         db.scans.insert_one({
-            "user_id": 0,
+            "user_email": current_user["email"],
             "image_path": db_image_path,
-            "defect_key": defect_key,
             "defect_label": predicted_class_raw,
-            "confidence": round(top1_conf * 100, 2),
-            "severity": severity,
-            "reason_1": info.get("reason_1"),
-            "reason_2": info.get("reason_2"),
-            "reason_3": info.get("reason_3"),
-            "machine": info.get("machine"),
-            "suggestion": info.get("suggestion"),
             "status": status_val,
             "created_at": datetime.datetime.now(datetime.timezone.utc)
         })
@@ -535,7 +524,7 @@ async def get_history(
     db = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
-    scans_raw = list(db.scans.find({"user_id": 0}).sort("created_at", -1))
+    scans_raw = list(db.scans.find({"user_email": current_user["email"]}).sort("created_at", -1))
     scans = []
     for s in scans_raw:
         s["id"] = str(s.pop("_id"))
@@ -547,7 +536,7 @@ async def get_analytics(
     db = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
-    scans = list(db.scans.find({"user_id": 0}))
+    scans = list(db.scans.find({"user_email": current_user["email"]}))
     total = len(scans)
     defects = len([s for s in scans if s.get("status") == "defect"])
     ok = total - defects

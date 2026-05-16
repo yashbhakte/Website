@@ -1,0 +1,7 @@
+Open a new Terminal in VS Code.
+
+Navigate to the backend folder by typing: cd backend
+
+Run the batch script by typing: .\run_backend.bat
+
+Wait a few seconds for it to say Starting server on port 8000...
