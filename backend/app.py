@@ -490,7 +490,10 @@ async def predict(
         
         # Final paths to save (prefer cloud URL, fallback to local if CF not configured)
         db_image_path = cf_url if cf_url else f"uploads/{filename}"
-        api_image_url = cf_url if cf_url else f"{str(request.base_url).rstrip('/')}/uploads/{filename}"
+        
+        # The frontend needs a URL to display the image. Since Cloudflare is private,
+        # we will always serve the local upload file to the frontend via our static folder.
+        api_image_url = f"{str(request.base_url).rstrip('/')}/uploads/{filename}"
 
         # Save to database
         db.scans.insert_one({

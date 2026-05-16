@@ -141,6 +141,8 @@ const DOM = {
   cameraIdle: $('camera-idle'),
   cameraFeed: $('camera-feed'),
   imagePreview: $('image-preview'),
+  cameraError: $('camera-error'),
+  btnResetCameraError: $('btn-reset-camera-error'),
   scanLine: $('scan-line'),
   processingOverlay: $('processing-overlay'),
   progressBar: $('progress-bar'),
@@ -194,9 +196,9 @@ const DOM = {
   erpSubmit: $('erp-submit'),
   erpNotes: $('erp-notes'),
 
-  invalidModal: $('invalid-sample-modal'),
-  invalidModalClose: $('invalid-modal-close'),
-  invalidModalOk: $('invalid-modal-ok'),
+  invalidModal: null, // Removed
+  invalidModalClose: null, // Removed
+  invalidModalOk: null, // Removed
 };
 
 /* ═══════════════════════════════════════════════════════════════
@@ -339,8 +341,6 @@ async function handleLogin(e) {
     DOM.loginLayout.classList.add('hidden');
     $('app-layout').classList.remove('hidden');
     DOM.headerRight.classList.remove('hidden');
-
-    showToast('success', 'Access Granted', `Welcome, ${appState.user.name}.`);
   } catch (err) {
     console.error('Login error:', err);
     let errorMessage = err.message || 'Incorrect email or password.';
@@ -574,7 +574,6 @@ function initCameraListeners() {
         <span class="btn__label">Stop Camera</span>`;
       DOM.btnCapturePhoto.classList.remove('hidden');
       DOM.btnUploadImage.classList.add('hidden');
-      showToast('info', 'Camera Active', 'Point camera at fabric sample, then tap Capture.');
     } catch (err) {
       console.error('Camera access error:', err);
       if (err.name === 'NotAllowedError') {
@@ -612,6 +611,8 @@ function initCameraListeners() {
       const files = Array.from(e.target.files || []).slice(0, 10);
       if (files.length === 0) return;
 
+      DOM.cameraError.classList.add('hidden'); // Ensure error state is hidden before new upload
+
       for (const file of files) {
         if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
           showToast('error', 'Invalid File', 'Please select valid image or video files.');
@@ -625,6 +626,13 @@ function initCameraListeners() {
 
       processBatch(files);
       e.target.value = '';
+    });
+  }
+
+  if (DOM.btnResetCameraError) {
+    DOM.btnResetCameraError.addEventListener('click', () => {
+      DOM.cameraError.classList.add('hidden');
+      DOM.cameraIdle.classList.remove('hidden');
     });
   }
 }
@@ -761,7 +769,10 @@ async function processBatch(files) {
       const apiResult = await response.json();
 
       if (apiResult.status === 'non_fabric') {
-        showInvalidSampleModal();
+        DOM.cameraIdle.classList.add('hidden');
+        DOM.imagePreview.classList.add('hidden');
+        DOM.cameraFeed.classList.add('hidden');
+        DOM.cameraError.classList.remove('hidden');
         continue; // Skip this item in the batch
       }
 
@@ -811,7 +822,9 @@ async function processBatch(files) {
       // If all samples in batch were rejected
       DOM.imagePreview.src = '';
       DOM.imagePreview.classList.add('hidden');
-      DOM.cameraIdle.classList.remove('hidden');
+      if (DOM.cameraError.classList.contains('hidden')) {
+        DOM.cameraIdle.classList.remove('hidden');
+      }
     }
   } catch (err) {
     console.error('Batch processing error:', err);
@@ -901,10 +914,11 @@ async function processImage(imageDataURL, source) {
     appState.isProcessing = false;
 
     if (apiResult.status === 'non_fabric') {
-      showInvalidSampleModal();
       DOM.imagePreview.src = '';
+      DOM.cameraIdle.classList.add('hidden');
       DOM.imagePreview.classList.add('hidden');
-      DOM.cameraIdle.classList.remove('hidden');
+      DOM.cameraFeed.classList.add('hidden');
+      DOM.cameraError.classList.remove('hidden');
       return;
     }
 
@@ -1045,7 +1059,6 @@ function initClearButton() {
     DOM.processingOverlay.classList.add('hidden');
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    showToast('info', 'Workspace Cleared', 'Ready for the next fabric scan.');
   });
 }
 
@@ -1387,10 +1400,6 @@ function init() {
 
   // Load demo data
   loadDemoLogs();
-
-  setTimeout(() => {
-    showToast('info', 'System Ready', 'EfficientNetB0 model loaded. Tap "Demo Scan" to try instantly.', 6000);
-  }, 800);
 }
 
 document.addEventListener('DOMContentLoaded', init);

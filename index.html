@@ -321,6 +321,25 @@
             <!-- Image Preview (after upload) -->
             <img id="image-preview" class="image-preview hidden" alt="Uploaded fabric sample for inspection" />
 
+            <!-- Error State (Non-Fabric) -->
+            <div class="camera-error hidden" id="camera-error"
+              style="text-align: center; padding: 32px 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
+              <div
+                style="width: 80px; height: 80px; border-radius: 50%; background: var(--clr-defect-bg); display: flex; align-items: center; justify-content: center; margin-bottom: 24px; border: 2px solid var(--clr-defect-border);">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--clr-defect)" stroke-width="2">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </div>
+              <h4 style="font-size: var(--fs-lg); font-weight: 800; margin-bottom: 8px; color: var(--clr-defect);">
+                Invalid Image Sample</h4>
+              <p
+                style="max-width: 320px; margin: 0 auto 24px; font-size: var(--fs-base); color: var(--clr-text-secondary);">
+                The AI engine has analyzed this image and determined it does NOT contain fabric. Please upload a valid
+                fabric sample to inspect.</p>
+              <button type="button" class="btn btn--primary" id="btn-reset-camera-error"
+                style="background: var(--clr-defect); color: white; border: none; min-width: 120px;">Try Again</button>
+            </div>
+
             <!-- Corner Brackets (decorative) -->
             <div class="frame-corner frame-corner--tl" aria-hidden="true"></div>
             <div class="frame-corner frame-corner--tr" aria-hidden="true"></div>
@@ -620,47 +639,7 @@
   <div id="toast-container" class="toast-container" role="region" aria-label="Notifications" aria-live="polite">
   </div>
 
-  <!-- Invalid Sample Warning Modal -->
-  <div class="modal-overlay hidden" id="invalid-sample-modal" role="dialog" aria-modal="true"
-    aria-labelledby="invalid-modal-title">
-    <div class="modal"
-      style="border-color: var(--clr-defect-border); box-shadow: var(--glow-defect), var(--shadow-elevated);">
-      <div class="modal__header" style="background: var(--clr-defect-bg);">
-        <div style="display: flex; align-items: center; gap: 12px;">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--clr-defect)" stroke-width="2.5">
-            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-            <line x1="12" y1="9" x2="12" y2="13" />
-            <line x1="12" y1="17" x2="12.01" y2="17" />
-          </svg>
-          <h3 class="modal__title" id="invalid-modal-title" style="color: var(--clr-defect);">Non-Fabric Image</h3>
-        </div>
-        <button class="modal__close" id="invalid-modal-close" aria-label="Close modal">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
-      </div>
-      <div class="modal__body" style="text-align: center; padding: 32px var(--sp-6);">
-        <div
-          style="width: 80px; height: 80px; border-radius: 50%; background: var(--clr-defect-bg); display: flex; align-items: center; justify-content: center; margin: 0 auto var(--sp-5); border: 2px solid var(--clr-defect-border);">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--clr-defect)" stroke-width="2">
-            <path d="M18 6L6 18M6 6l12 12" />
-          </svg>
-        </div>
-        <h4 style="font-size: var(--fs-lg); font-weight: 800; margin-bottom: 8px; color: var(--clr-text-primary);">
-          Invalid Image Sample</h4>
-        <p class="modal__desc" style="max-width: 320px; margin: 0 auto; font-size: var(--fs-base);">The AI engine has
-          analyzed this image and determined it does NOT contain fabric. Please upload a valid fabric sample to inspect.
-        </p>
-      </div>
-      <div class="modal__footer"
-        style="border-top: none; padding-top: 0; justify-content: center; padding-bottom: var(--sp-6);">
-        <button class="btn btn--primary" id="invalid-modal-ok"
-          style="min-width: 120px; background: var(--clr-defect); color: white;">Got it</button>
-      </div>
-    </div>
-  </div>
+  <!-- (Invalid Sample Modal removed as it is now integrated into the camera frame) -->
 
   <script src="app.js?v=8"></script>
 </body>

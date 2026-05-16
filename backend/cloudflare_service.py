@@ -21,8 +21,7 @@ def is_cloudflare_configured() -> bool:
         CLOUDFLARE_ACCOUNT_ID,
         CLOUDFLARE_R2_ACCESS_KEY_ID,
         CLOUDFLARE_R2_SECRET_ACCESS_KEY,
-        CLOUDFLARE_R2_BUCKET_NAME,
-        CLOUDFLARE_R2_PUBLIC_URL
+        CLOUDFLARE_R2_BUCKET_NAME
     ])
 
 def upload_to_r2(local_file_path: str, cloud_filename: str) -> str:
@@ -71,7 +70,10 @@ def upload_to_r2(local_file_path: str, cloud_filename: str) -> str:
             )
             
         # Generate final public URL
-        public_url = f"{CLOUDFLARE_R2_PUBLIC_URL}/{cloud_filename}"
+        if CLOUDFLARE_R2_PUBLIC_URL:
+            public_url = f"{CLOUDFLARE_R2_PUBLIC_URL}/{cloud_filename}"
+        else:
+            public_url = f"r2://{CLOUDFLARE_R2_BUCKET_NAME}/{cloud_filename}"
         logger.info(f"Successfully uploaded to Cloudflare R2! URL: {public_url}")
         return public_url
         
